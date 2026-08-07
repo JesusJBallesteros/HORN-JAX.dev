@@ -1,0 +1,12 @@
+# Core
+jax[cuda12]>=0.6      # on WSL2 with an NVIDIA GPU. CPU-only: use "jax" instead.
+optax>=0.2            # optimisers
+numpy
+matplotlib
+
+# Dev
+pytest
+ruff                  # linting + formatting
+
+# Optional: the reference HORN implementation, to check yourself against
+# brainmass
