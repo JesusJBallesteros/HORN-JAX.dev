@@ -1,4 +1,4 @@
-# horn-jax
+# JAX-HORN
 
 A JAX implementation of Harmonic Oscillator Recurrent Networks (HORN).
 First step is to implement a functional core and test:
