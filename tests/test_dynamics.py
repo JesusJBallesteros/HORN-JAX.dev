@@ -1,15 +1,12 @@
 """Correctness tests for the HORN core.
 
-THE PRINCIPLE BEHIND THESE TESTS
---------------------------------
-These do not check the code against itself (that only proves it is
-self-consistent, including self-consistently wrong). They check it against
-PHYSICS. An uncoupled, unforced HORN unit is just a damped harmonic
-oscillator, and that has a known closed-form solution, so we can compare
-against ground truth rather than against a previous run.
+These do not check the code itself. They check the physics of the model, which is what matters.
+The HORN is a recurrent neural network, but it is also a physical system: a population of coupled
+damped harmonic oscillators. The physics is what makes the model useful.
+An uncoupled, unforced HORN unit is just a damped harmonic oscillator, and that has a known
+closed-form solution, so we can compare against ground truth.
 
-When an oscillator implementation is broken it is nearly always the
-integrator that is broken, and tests 1 and 2 both fail loudly when it is.
+When an oscillator implementation is broken it is nearly always the integrator that is broken.
 
 Run with:  python -m pytest tests/ -q
 """

@@ -38,14 +38,12 @@ dt, T = 1e-3, 8000                  # 1 ms steps for 8 s of simulated time
 t = jnp.arange(T) * dt              # time axis in seconds, for plotting
 fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))   # one row, two panels, size (inches)
 
-# ---------------------------------------------------------------------------
 # LEFT PANEL: damping controls how long a unit remembers
-# ---------------------------------------------------------------------------
-for zeta, label in [(0.02, "underdamped  z=0.02"),   # rings for a long time = long memory
-                    (0.3,  "underdamped  z=0.3"),    # a few visible oscillations
+for zeta, label in [(0.05, "underdamped  z=0.05"),   # rings for a long time = long memory
+                    (0.35,  "underdamped  z=0.35"),    # a few visible oscillations
                     (1.0,  "critical     z=1.0"),    # fastest return with no overshoot
-                    (3.0,  "overdamped   z=3.0")]:   # sluggish crawl, never crosses zero
-    p = isolated(1, 2.0, zeta)                              # one unit, omega fixed at 2
+                    (2.5,  "overdamped   z=2.5")]:   # sluggish crawl, never crosses zero
+    p = isolated(1, 8, zeta)                              # one unit, omega fixed at 8
     s0 = HORNState(x=jnp.ones((1,)), v=jnp.zeros((1,)))     # released from rest at x=1
     _, xs = run_sequence(p, s0, jnp.zeros((T, 1)), dt)      # no input: pure free decay
     ax[0].plot(t, xs[:, 0], label=label, lw=1.4)            # column 0 = the single unit
@@ -54,10 +52,8 @@ ax[0].set(title="Damping controls memory horizon", xlabel="time (s)", ylabel="x"
 ax[0].legend(fontsize=8, frameon=False)
 ax[0].axhline(0, color="k", lw=0.5)   # zero line, to make overshoot easy to see
 
-# ---------------------------------------------------------------------------
 # RIGHT PANEL: heterogeneous omega = a bank of filters
-# ---------------------------------------------------------------------------
-omegas = jnp.array([1.0, 2.0, 4.0, 8.0])   # octave spacing, so ratios are easy to read off
+omegas = jnp.array([2.0, 4.0, 8.0, 16.0])   # octave spacing, so ratios are easy to read off
 p = isolated(4, omegas, 0.05)              # four units, one per frequency, lightly damped
 s0 = HORNState(x=jnp.ones((4,)), v=jnp.zeros((4,)))   # all four released together
 _, xs = run_sequence(p, s0, jnp.zeros((T, 1)), dt)    # xs is (T, 4): one column per unit
