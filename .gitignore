@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Testing / tooling
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Outputs — regenerate with `python demo.py`
+*.png
+!docs/*.png
+results/
+checkpoints/
+
+# Data
+data/
+*.npz
+*.npy
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
