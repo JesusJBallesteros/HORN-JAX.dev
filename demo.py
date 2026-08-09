@@ -36,7 +36,7 @@ def isolated(n, omega, zeta):
 
 dt, T = 1e-3, 8000                  # 1 ms steps for 8 s of simulated time
 t = jnp.arange(T) * dt              # time axis in seconds, for plotting
-fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))   # one row, two panels
+fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))   # one row, two panels, size (inches)
 
 # ---------------------------------------------------------------------------
 # LEFT PANEL: damping controls how long a unit remembers
