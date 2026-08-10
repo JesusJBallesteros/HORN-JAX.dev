@@ -1,4 +1,4 @@
-# JAX-HORN
+# HORN-JAX.dev
 
 A JAX implementation of Harmonic Oscillator Recurrent Networks (HORN)
 First step is to implement a functional core and test:
@@ -6,6 +6,7 @@ different units with varied dumped levels (zeta)
 different units with varied frequencies (omega)
 
 GOAL is to get a basic understanding of it all...
+
 TOP GOAL is to play with an idea of nested-HORN+SNN, for the fun of it.
 
 ## What HORN is
