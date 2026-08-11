@@ -38,6 +38,17 @@ FILES = {
     "yte": "t10k-labels-idx1-ubyte.gz",
 }
 
+<<<<<<< HEAD
+=======
+# Bumped whenever the cache layout changes: key names, dtype, or scaling. An
+# earlier loader wrote the same filename with keys train_images/train_labels/...
+# and uint8 images, so a cache written by it looks valid and then fails with a
+# KeyError deep inside this function. A version stamp turns that into a rebuild
+# and one line of explanation.
+CACHE_VERSION = 2
+_REQUIRED_KEYS = ("xtr", "ytr", "xte", "yte")
+
+>>>>>>> e3b3bd2 (Fixed staled data error and documented)
 
 def _read_idx(raw: bytes) -> np.ndarray:
     """Parse the IDX binary format used by MNIST.
@@ -60,6 +71,23 @@ def _read_idx(raw: bytes) -> np.ndarray:
     return np.frombuffer(raw, dtype=np.uint8, offset=4 + 4 * ndim).reshape(dims)
 
 
+<<<<<<< HEAD
+=======
+def _cache_is_current(cached: dict) -> bool:
+    """Does this loaded .npz match what the current loader expects?
+
+    Checked before use rather than discovered by a KeyError halfway through. The
+    version stamp catches same-keys-different-meaning changes too, such as images
+    switching from uint8 to float32 - which no key check would notice.
+    """
+    if not all(k in cached for k in _REQUIRED_KEYS):
+        return False
+    if "_version" not in cached:
+        return False
+    return int(cached["_version"]) == CACHE_VERSION
+
+
+>>>>>>> e3b3bd2 (Fixed staled data error and documented)
 def _fetch(name: str) -> bytes:
     errors = []
     for mirror in MIRRORS:
@@ -103,17 +131,36 @@ def load_mnist(cache_dir: str | Path | None = None, scale: str = "unit"):
     cache_dir.mkdir(parents=True, exist_ok=True)
     npz = cache_dir / "mnist.npz"
 
+<<<<<<< HEAD
     if npz.exists():
         with np.load(npz) as d:
             out = {k: d[k] for k in d.files}
     else:
+=======
+    out = None
+    if npz.exists():
+        with np.load(npz) as d:
+            cached = {k: d[k] for k in d.files}
+        if _cache_is_current(cached):
+            out = cached
+        else:
+            print(f"  cache at {npz} was written by an older loader "
+                  f"(keys {sorted(k for k in cached if not k.startswith('_'))}); rebuilding")
+            npz.unlink()
+
+    if out is None:
+>>>>>>> e3b3bd2 (Fixed staled data error and documented)
         print(f"MNIST not cached, downloading to {npz} (~11 MB, once):")
         out = {}
         for key, fname in FILES.items():
             arr = _read_idx(_fetch(fname))
             out[key] = (arr.astype(np.float32) / 255.0 if key.startswith("x")
                         else arr.astype(np.int32))
+<<<<<<< HEAD
         np.savez_compressed(npz, **out)
+=======
+        np.savez_compressed(npz, _version=np.asarray(CACHE_VERSION), **out)
+>>>>>>> e3b3bd2 (Fixed staled data error and documented)
         print(f"  cached to {npz}")
 
     xtr, ytr, xte, yte = out["xtr"], out["ytr"], out["xte"], out["yte"]

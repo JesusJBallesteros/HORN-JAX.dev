@@ -63,7 +63,11 @@ horn/core.py            dynamics: init_params, step, run_sequence, energy
 horn/model.py           sequence model: init_net, forward, loss_and_acc, usable_band
 horn/data.py            MNIST: IDX parsing, npz cache. Raises rather than faking data.
 horn/paths.py           REPO / DATA_DIR / RESULTS_DIR, anchored to the package
+<<<<<<< HEAD
 tests/                  21 tests. test_dynamics = physics; test_model = plumbing;
+=======
+tests/                  23 tests. test_dynamics = physics; test_model = plumbing;
+>>>>>>> e3b3bd2 (Fixed staled data error and documented)
                         test_data = loader; test_paths = path anchoring. See TESTING.md.
 notebooks/01_test_core  validation against closed-form solutions
 notebooks/02_sequence_training  readout, training loop, sMNIST
@@ -117,5 +121,9 @@ Designing that task is the next scientific step after sMNIST.
   rather than once per directory you happen to launch from.
 - The frequency-discrimination task at a 1-2000 Hz band over 1 s implies L = 20,000 steps,
   which is 25x longer than pixel-wise MNIST. Watch BPTT memory; raise `dt` if it bites.
+- **The MNIST cache is version-stamped** (`CACHE_VERSION` in `data.py`). A `.npz` written by an
+  older loader is detected and rebuilt rather than half-read — the first version of this failed
+  with `KeyError: 'xtr'` from the middle of `load_mnist`. Bump the version whenever key names,
+  dtype or scaling change.
 - Set `git config core.autocrlf input` (or use the `.gitattributes`) when moving between
   Windows and WSL, or every file shows as fully modified.

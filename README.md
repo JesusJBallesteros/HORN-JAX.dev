@@ -48,7 +48,11 @@ horn/data.py                     MNIST: IDX parsing, caching, no synthetic fallb
 horn/paths.py                    repo-anchored paths, so output never lands in the cwd
 tests/test_dynamics.py           5 tests — physics against closed-form solutions
 tests/test_model.py              8 tests — shapes, gradients, plumbing
+<<<<<<< HEAD
 tests/test_data.py               4 tests — IDX format, caching, scaling
+=======
+tests/test_data.py               6 tests — IDX format, cache validation, scaling
+>>>>>>> e3b3bd2 (Fixed staled data error and documented)
 tests/test_paths.py              4 tests — path anchoring, no import side effects
 notebooks/01_test_core.ipynb     validation against analytic solutions
 notebooks/02_sequence_training.ipynb   readout, the two fixes, training, sMNIST
@@ -120,7 +124,11 @@ uv venv --python 3.12 && source .venv/bin/activate
 uv pip install -e ".[dev,notebooks]"        # CPU
 # uv pip install -e ".[cuda,dev,notebooks]" # NVIDIA GPU on WSL2, see SETUP.md
 
+<<<<<<< HEAD
 pytest                                      # 21 passed — see TESTING.md
+=======
+pytest                                      # 23 passed — see TESTING.md
+>>>>>>> e3b3bd2 (Fixed staled data error and documented)
 python demo.py                              # writes results/demo.png
 jupyter lab notebooks/                      # 01 then 02
 ```
