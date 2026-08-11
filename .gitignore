@@ -9,6 +9,7 @@ venv/
 .pytest_cache/
 .ruff_cache/
 .ipynb_checkpoints/
+HORN_repo_plan.md
 
 # Outputs — regenerate with `python demo.py`
 *.png
