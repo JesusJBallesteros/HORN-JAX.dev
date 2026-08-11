@@ -4,6 +4,8 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+build/
+dist/
 
 # Testing / tooling
 .pytest_cache/
@@ -11,10 +13,13 @@ venv/
 .ipynb_checkpoints/
 HORN_repo_plan.md
 
-# Outputs — regenerate with `python demo.py`
+# Outputs
+# Figures are ignored by default so stray plots do not accumulate, but anything
+# deliberately placed in results/ or docs/ is kept.
 *.png
 !docs/*.png
-results/
+!results/*.png
+!results/*.json
 checkpoints/
 
 # Data

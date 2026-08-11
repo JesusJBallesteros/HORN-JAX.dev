@@ -61,9 +61,13 @@ Both were predicted by finding #1 above, and both look like a learning-rate prob
 ```
 horn/core.py            dynamics: init_params, step, run_sequence, energy
 horn/model.py           sequence model: init_net, forward, loss_and_acc, usable_band
-tests/                  13 tests. test_dynamics = physics; test_model = plumbing
+horn/data.py            MNIST: IDX parsing, npz cache. Raises rather than faking data.
+horn/paths.py           REPO / DATA_DIR / RESULTS_DIR, anchored to the package
+tests/                  21 tests. test_dynamics = physics; test_model = plumbing;
+                        test_data = loader; test_paths = path anchoring. See TESTING.md.
 notebooks/01_test_core  validation against closed-form solutions
 notebooks/02_sequence_training  readout, training loop, sMNIST
+results/                curated figures and run records, committed on purpose
 HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
 ```
 
@@ -81,12 +85,36 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
 - [ ] Spiking readout: does phase coding degrade more gracefully than a continuous readout
       under quantisation of the hidden state?
 
+## The open tension
+
+Frequency discrimination trains to 1.00 with `pool="rms"`, which discards phase entirely. So
+the project's headline claim — that oscillators carry information in amplitude *and phase*, a
+strictly richer state space at equal unit count — is **not exercised by any task in the repo**.
+The `rms`-vs-`mean` ablation is already built and is the right instrument; what is missing is a
+task on which `rms` *loses*. Until then, everything demonstrated here is reachable with a bank
+of bandpass filters and a power readout.
+
+Designing that task is the next scientific step after sMNIST.
+
 ## Gotchas
 
-- MNIST download can fail behind restrictive networks; the loader falls back to synthetic
-  data **loudly**. If you see the warning banner, the numbers are meaningless.
-- Notebook 01 uses a simple `sys.path` insert and must be launched from `notebooks/`.
-  Notebook 02 searches upward for the repo and works from anywhere (and on Colab).
+- MNIST download can fail behind restrictive networks. The loader now **raises** rather than
+  substituting synthetic data — a warning banner scrolls off, and a plausible accuracy number
+  computed on noise is worse than a crash. If offline, drop `mnist.npz` into `data/`.
+- **`ModuleNotFoundError: No module named 'horn'`** used to happen because VS Code's
+  `jupyter.notebookFileRoot` defaults to the *workspace* folder, so with the workspace opened
+  one level above the repo the package sat below cwd and no `sys.path` walk could find it.
+  **Fixed properly:** the project is now installable. `pip install -e ".[dev,notebooks]"` from
+  the repo root, and `import horn` resolves everywhere with no path manipulation. If it recurs,
+  the kernel is on the wrong interpreter — check it points at `.venv/bin/python`.
+- After adding a NEW module to `horn/`, no reinstall is needed (editable installs track the
+  source tree). After changing `pyproject.toml` dependencies, reinstall.
+- Notebook setup cells print the resolved `REPO`; glance at it the first time on any machine.
+- **Never write output to a relative path.** Editable install means scripts run from anywhere,
+  so `plt.savefig("x.png")` lands in whatever directory the shell was in. Use
+  `from horn.paths import results` and `plt.savefig(results("x.png"))`. Same for the MNIST
+  cache — `load_mnist()` with no argument defaults to `<repo>/data`, so it is downloaded once
+  rather than once per directory you happen to launch from.
 - The frequency-discrimination task at a 1-2000 Hz band over 1 s implies L = 20,000 steps,
   which is 25x longer than pixel-wise MNIST. Watch BPTT memory; raise `dt` if it bites.
 - Set `git config core.autocrlf input` (or use the `.gitattributes`) when moving between

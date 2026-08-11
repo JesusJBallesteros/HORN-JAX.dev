@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "horn-jax"
+version = "0.1.0"
+description = "A from-scratch JAX implementation of Harmonic Oscillator Recurrent Networks"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Jesus J. Ballesteros" }]
+
+# Base install is CPU JAX. For an NVIDIA GPU install the `cuda` instead, see SETUP.md. 
+dependencies = [
+    "jax>=0.6",
+    "optax>=0.2",
+    "numpy",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+cuda = ["jax[cuda12]>=0.6"]
+dev = ["pytest>=8", "ruff"]
+notebooks = ["jupyterlab", "ipykernel"]
+
+# Explicit
+[tool.setuptools]
+packages = ["horn"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -v lists every test by name. The names are part of the documentation here -
+# "energy conserved when undamped" says what is being checked, where a row of
+# dots says only that something passed. --durations shows which are slow, which
+# is informative rather than incidental: the slow ones integrate tens of
+# thousands of steps because that is what testing an integrator requires.
+addopts = "-v --durations=5"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# E501 line length is handled by the formatter; E741 allows `l` as a loop index.
+ignore = ["E501"]

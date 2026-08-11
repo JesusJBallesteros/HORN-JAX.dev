@@ -1,0 +1,80 @@
+"""Tests for the MNIST loader.
+
+No network access required. The IDX wire format is constructed from bytes here,
+so the parsing path is genuinely exercised rather than mocked past - which is how
+a header bug survived in this file once already.
+"""
+
+import struct
+
+import numpy as np
+import pytest
+
+from horn.data import _read_idx, load_mnist
+
+
+def _idx_blob(arr: np.ndarray, dtype_code: int = 0x08) -> bytes:
+    """Serialise a uint8 array in IDX format, exactly as the mirrors serve it."""
+    return (struct.pack(">HBB", 0, dtype_code, arr.ndim)
+            + struct.pack(f">{arr.ndim}I", *arr.shape)
+            + arr.tobytes())
+
+
+def test_idx_roundtrip():
+    """The header is 00 00 <dtype> <ndim>, not <magic> <ndim>.
+
+    The original version validated the dtype byte against zero and so rejected
+    every real MNIST file with 'not an IDX file (magic prefix 8)'.
+    """
+    payload = np.arange(6, dtype=np.uint8).reshape(2, 3)
+    np.testing.assert_array_equal(_read_idx(_idx_blob(payload)), payload)
+
+    images = np.arange(2 * 28 * 28, dtype=np.uint8).reshape(2, 28, 28)
+    np.testing.assert_array_equal(_read_idx(_idx_blob(images)), images)
+
+
+def test_idx_rejects_bad_headers():
+    """Corruption must raise, not reshape into plausible-looking garbage."""
+    payload = np.arange(6, dtype=np.uint8).reshape(2, 3)
+
+    with pytest.raises(ValueError, match="uint8"):
+        _read_idx(_idx_blob(payload, dtype_code=0x0D))     # float32 IDX, unsupported
+
+    bad_magic = b"\x01\x00" + _idx_blob(payload)[2:]
+    with pytest.raises(ValueError, match="not an IDX file"):
+        _read_idx(bad_magic)
+
+
+def test_load_mnist_reads_cache_and_scales(tmp_path):
+    """load_mnist must use the cache without touching the network, and scale correctly.
+
+    A fabricated cache stands in for the real download. If this test ever starts
+    making network calls it will fail on an offline machine, which is the point:
+    the cached path must be self-sufficient.
+    """
+    rng = np.random.default_rng(0)
+    xtr = rng.random((40, 28, 28), dtype=np.float32)
+    xte = rng.random((10, 28, 28), dtype=np.float32)
+    np.savez_compressed(tmp_path / "mnist.npz", xtr=xtr,
+                        ytr=rng.integers(0, 10, 40).astype(np.int32),
+                        xte=xte, yte=rng.integers(0, 10, 10).astype(np.int32))
+
+    a_tr, a_ytr, a_te, _ = load_mnist(tmp_path, scale="unit")
+    np.testing.assert_allclose(a_tr, xtr)
+    assert a_ytr.dtype == np.int32
+
+    b_tr, _, b_te, _ = load_mnist(tmp_path, scale="standard")
+    assert abs(float(b_tr.mean())) < 1e-5
+    assert float(b_tr.std()) == pytest.approx(1.0, rel=1e-4)
+
+    # Test data must be standardised with TRAIN statistics, not its own - otherwise
+    # information leaks from the test set into preprocessing.
+    expected_te = (xte - xtr.mean()) / xtr.std()
+    np.testing.assert_allclose(b_te, expected_te, rtol=1e-5)
+
+
+def test_unknown_scale_raises_before_any_io(tmp_path):
+    """A bad scale must fail immediately, without downloading or creating a cache."""
+    with pytest.raises(ValueError, match="scale"):
+        load_mnist(tmp_path / "nonexistent", scale="whatever")
+    assert not (tmp_path / "nonexistent").exists(), "validation ran after touching disk"

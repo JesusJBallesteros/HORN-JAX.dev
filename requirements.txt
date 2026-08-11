@@ -1,12 +1,7 @@
-# Core
-jax[cuda12]>=0.6      # on WSL2 with an NVIDIA GPU. CPU-only: use "jax" instead.
-optax>=0.2            # optimisers
-numpy
-matplotlib
+# Dependencies live in pyproject.toml. This file exists so that the old
+# `pip install -r requirements.txt` habit still does the right thing.
+#
+#   CPU:   pip install -e ".[dev,notebooks]"
+#   CUDA:  pip install -e ".[cuda,dev,notebooks]"     # WSL2 + NVIDIA, see SETUP.md
 
-# Dev
-pytest
-ruff                  # linting + formatting
-
-# Optional: the reference HORN implementation, to check yourself against
-# brainmass
+-e .[dev,notebooks]

@@ -1,4 +1,4 @@
-# Local setup — Windows + NVIDIA GPU + WSL2 + JAX
+# Local setup for Windows + NVIDIA GPU + JAX
 
 ## 1. Install WSL2
 
@@ -14,7 +14,7 @@ Open Ubuntu and run:
 nvidia-smi
 ```
 
-You should see your card, driver version, and CUDA version.
+You should see your card, driver version, and CUDA version. If not, look up how to fix a CUDA/Nvidia drivers unaccesible issue
 
 ## 3. Base tooling
 
@@ -30,14 +30,12 @@ exec $SHELL          # reload so uv is on PATH
 ## 4. Create the project
 
 ```bash
-cd ~                         # NOTE: your home dir, NOT /mnt/c/...
+cd ~
 mkdir horn-jax && cd horn-jax
 uv venv --python 3.12
 source .venv/bin/activate
 uv pip install "jax[cuda12]" optax numpy matplotlib pytest ruff
 ```
-
-> **Keep the project inside the WSL filesystem** (`~/horn-jax`), not on the Windows side (`/mnt/c/Users/...`).
 
 ## 5. Verify JAX sees the GPU
 
@@ -58,7 +56,7 @@ t = time.time(); jax.block_until_ready(x @ x); print(f'{time.time()-t:.4f}s')
 "
 ```
 
-Well under 0.05s means the GPU is doing the work.
+If under 0.05s, the GPU is doing the work.
 
 ## 6. Editor
 
@@ -72,7 +70,7 @@ VS Code runs its UI on Windows and its language server inside Linux. Select the 
 
 ## 7. Drop in the starter code
 
-Copy the contents of `horn_starter/` into `~/horn-jax/`, then:
+Clone the repo into `~/horn-jax/`, then:
 
 ```bash
 python -m pytest tests/ -q      # expect: 5 passed

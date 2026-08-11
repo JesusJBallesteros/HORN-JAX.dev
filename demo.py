@@ -1,4 +1,4 @@
-"""Visual smoke test: what damping and frequency actually do.
+"""Visual test: what damping and frequency actually do.
 
 Produces two panels:
   LEFT  - the same oscillator at four damping ratios, showing how zeta sets
@@ -6,7 +6,10 @@ Produces two panels:
   RIGHT - four oscillators at different omega, showing that a heterogeneous
           population is a filter bank.
 
-Run:  python demo.py    ->  writes demo.png
+Run:  python demo.py    ->  writes results/demo.png
+
+The figure goes to results/ inside the repo, wherever this is run from - see
+horn/paths.py for why that is not the same as the working directory.
 """
 
 import jax.numpy as jnp
@@ -17,6 +20,7 @@ matplotlib.use("Agg")          # non-interactive backend: renders straight to fi
 import matplotlib.pyplot as plt
 
 from horn.core import HORNParams, HORNState, run_sequence
+from horn.paths import results
 
 
 def isolated(n, omega, zeta):
@@ -67,5 +71,6 @@ ax[1].set(title="Heterogeneous omega = a learned filter bank",
 ax[1].legend(fontsize=8, frameon=False)
 
 plt.tight_layout()                  # stop labels overlapping between panels
-plt.savefig("demo.png", dpi=130)    # write to disk (no plt.show(): headless backend)
-print("wrote demo.png")
+out = results("demo.png")           # always inside the repo, never the cwd
+plt.savefig(out, dpi=130)           # write to disk (no plt.show(): headless backend)
+print(f"wrote {out}")

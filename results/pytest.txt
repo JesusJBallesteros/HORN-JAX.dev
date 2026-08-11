@@ -1,0 +1,38 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /home/jesus/horn-jax/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/jesus/horn-jax
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2
+collecting ... collected 21 items
+
+tests/test_data.py::test_idx_roundtrip PASSED                            [  4%]
+tests/test_data.py::test_idx_rejects_bad_headers PASSED                  [  9%]
+tests/test_data.py::test_load_mnist_reads_cache_and_scales PASSED        [ 14%]
+tests/test_data.py::test_unknown_scale_raises_before_any_io PASSED       [ 19%]
+tests/test_dynamics.py::test_matches_analytic_underdamped PASSED         [ 23%]
+tests/test_dynamics.py::test_energy_conserved_when_undamped PASSED       [ 28%]
+tests/test_dynamics.py::test_overdamped_decays_without_oscillating PASSED [ 33%]
+tests/test_dynamics.py::test_heterogeneous_frequencies_are_independent PASSED [ 38%]
+tests/test_dynamics.py::test_gradients_flow PASSED                       [ 42%]
+tests/test_model.py::test_forward_shapes PASSED                          [ 47%]
+tests/test_model.py::test_readout_uses_velocity PASSED                   [ 52%]
+tests/test_model.py::test_batch_is_independent PASSED                    [ 57%]
+tests/test_model.py::test_gradients_finite_and_nonzero PASSED            [ 61%]
+tests/test_model.py::test_freeze_zeroes_only_oscillator_constants PASSED [ 66%]
+tests/test_model.py::test_usable_band_ratio_depends_only_on_length PASSED [ 71%]
+tests/test_model.py::test_band_summary_roundtrip PASSED                  [ 76%]
+tests/test_model.py::test_log_spaced_bands_endpoints PASSED              [ 80%]
+tests/test_paths.py::test_repo_is_the_package_parent PASSED              [ 85%]
+tests/test_paths.py::test_paths_do_not_depend_on_cwd PASSED              [ 90%]
+tests/test_paths.py::test_helpers_create_on_demand_and_return_child PASSED [ 95%]
+tests/test_paths.py::test_import_has_no_disk_side_effects PASSED         [100%]
+
+============================= slowest 5 durations ==============================
+11.57s call     tests/test_dynamics.py::test_heterogeneous_frequencies_are_independent
+4.80s call     tests/test_dynamics.py::test_matches_analytic_underdamped
+3.49s call     tests/test_model.py::test_gradients_finite_and_nonzero
+1.89s call     tests/test_model.py::test_forward_shapes
+1.63s call     tests/test_dynamics.py::test_gradients_flow
+============================= 21 passed in 28.70s ==============================
