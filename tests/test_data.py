@@ -10,11 +10,7 @@ import struct
 import numpy as np
 import pytest
 
-<<<<<<< HEAD
-from horn.data import _read_idx, load_mnist
-=======
 from horn.data import CACHE_VERSION, _cache_is_current, _read_idx, load_mnist
->>>>>>> e3b3bd2 (Fixed staled data error and documented)
 
 
 def _idx_blob(arr: np.ndarray, dtype_code: int = 0x08) -> bytes:
@@ -49,8 +45,6 @@ def test_idx_rejects_bad_headers():
         _read_idx(bad_magic)
 
 
-<<<<<<< HEAD
-=======
 def test_cache_validation_rejects_stale_layouts():
     """Regression: a cache from an older loader must be detected, not KeyError'd.
 
@@ -90,7 +84,6 @@ def test_stale_cache_is_deleted_not_used(tmp_path):
     assert not npz.exists(), "stale cache left in place"
 
 
->>>>>>> e3b3bd2 (Fixed staled data error and documented)
 def test_load_mnist_reads_cache_and_scales(tmp_path):
     """load_mnist must use the cache without touching the network, and scale correctly.
 
@@ -101,13 +94,8 @@ def test_load_mnist_reads_cache_and_scales(tmp_path):
     rng = np.random.default_rng(0)
     xtr = rng.random((40, 28, 28), dtype=np.float32)
     xte = rng.random((10, 28, 28), dtype=np.float32)
-<<<<<<< HEAD
-    np.savez_compressed(tmp_path / "mnist.npz", xtr=xtr,
-                        ytr=rng.integers(0, 10, 40).astype(np.int32),
-=======
     np.savez_compressed(tmp_path / "mnist.npz", _version=np.asarray(CACHE_VERSION),
                         xtr=xtr, ytr=rng.integers(0, 10, 40).astype(np.int32),
->>>>>>> e3b3bd2 (Fixed staled data error and documented)
                         xte=xte, yte=rng.integers(0, 10, 10).astype(np.int32))
 
     a_tr, a_ytr, a_te, _ = load_mnist(tmp_path, scale="unit")

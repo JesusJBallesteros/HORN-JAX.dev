@@ -50,11 +50,7 @@ differently only because it has statements at module level that execute on impor
 
 ## What is tested, and why these things
 
-<<<<<<< HEAD
-The suite is 21 tests in four files. The split is deliberate: physics in one place, plumbing in
-=======
 The suite is 23 tests in four files. The split is deliberate: physics in one place, plumbing in
->>>>>>> e3b3bd2 (Fixed staled data error and documented)
 another, so a failure tells you immediately which kind of problem you have.
 
 ### `tests/test_dynamics.py` — the physics (5)
@@ -79,13 +75,6 @@ catch that.
 Shapes, batch independence, gradient reach into every parameter including `log_omega` and
 `log_zeta`, the freeze mechanism, and the `usable_band` arithmetic.
 
-<<<<<<< HEAD
-### `tests/test_data.py` — the loader (4)
-
-Constructs IDX files from raw bytes so the parsing path is genuinely exercised. It exists
-because a header bug once shipped here: the version that validated the dtype byte against zero
-rejected every valid MNIST file. No network access required.
-=======
 ### `tests/test_data.py` — the loader (6)
 
 Constructs IDX files from raw bytes so the parsing path is genuinely exercised. It exists
@@ -93,7 +82,6 @@ because a header bug once shipped here: the version that validated the dtype byt
 rejected every valid MNIST file. Two further tests cover cache validation, after a cache written
 by an older loader was read as valid and blew up with `KeyError: 'xtr'` halfway through. No
 network access required by any of them.
->>>>>>> e3b3bd2 (Fixed staled data error and documented)
 
 ### `tests/test_paths.py` — path anchoring (4)
 
@@ -128,11 +116,7 @@ pytest --pdb            # drop into the debugger at the point of failure
 ```
 
 `--lf` ("last failed") reads `.pytest_cache/`, which is gitignored. After a green run it falls
-<<<<<<< HEAD
-back to running everything, which is why it shows 21 passed rather than nothing.
-=======
 back to running everything, which is why it shows all 23 rather than nothing.
->>>>>>> e3b3bd2 (Fixed staled data error and documented)
 
 Tolerances in the physics tests are set to the accuracy the integrator can actually deliver, not
 to whatever made them pass. Semi-implicit Euler is first order, so error scales with `dt` — if a

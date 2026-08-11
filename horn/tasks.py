@@ -1,0 +1,214 @@
+"""Synthetic tasks, and the frequency banks used to attack them.
+
+Two tasks live here.
+
+`freq_batch`    classify which of several frequencies a noisy sinusoid carries.
+                Solved perfectly by power pooling. It is a plumbing check, not
+                evidence for anything: a magnitude FFT plus logistic regression
+                does the same job.
+
+`biphase_batch` the one that is actually a question. See below.
+
+THE BIPHASE TASK
+----------------
+Every stimulus is the same two tones, at f and 2f, at the same amplitudes:
+
+    s(t) = sin(2*pi*f*t + p) + sin(2*pi*2f*t + 2p + psi)
+
+`p` is a global phase drawn uniformly per example. The class is `psi`, the
+BIPHASE: the phase of the second harmonic relative to twice the phase of the
+first. This is the quantity a bispectrum measures, and it is what the
+cross-frequency-coupling literature calls quadratic phase coupling.
+
+Three properties make it the right instrument for this repo:
+
+1. **The power spectrum is identical across classes.** Both tones have fixed
+   amplitude; only their relative phase changes. So any readout that sees only
+   power is at chance BY CONSTRUCTION, not as an empirical finding. `pool="rms"`
+   is therefore a falsification test rather than a baseline.
+
+2. **`psi` survives a global time shift.** Shifting t -> t + tau sends
+   p -> p + 2*pi*f*tau and the second tone's phase to 2*(p + 2*pi*f*tau) + psi.
+   The `2p` structure is what makes this work: psi is invariant, so the label
+   cannot be read off any absolute time reference. A readout of the final state
+   alone is therefore also at chance, since the global phase is random.
+
+3. **Extracting `psi` requires a nonlinearity, and a specific one.** psi appears
+   in the signal only in cross-terms between the two tones. Expanding a cubic
+   nonlinearity in a sum of tones at f and 2f, the term in
+   cos^2(2*pi*f*t + p) * cos(2*pi*2f*t + 2p + psi) contains a component at zero
+   frequency proportional to cos(psi). A DC offset that depends on the biphase.
+
+   So the prediction is sharp and falsifiable: a bank of INDEPENDENT resonators
+   feeding a linear readout cannot do this at all, whatever the pooling, because
+   no linear function of per-unit features contains a product of two units.
+
+MEASURED AT INITIALISATION, BEFORE ANY TRAINING
+-----------------------------------------------
+Held-out accuracy of a ridge readout on the pooled features of an UNTRAINED
+network, 3 classes, chance 0.333 (see `experiments/probe_mechanism.py`):
+
+    rms|x|    W_rec        mean     rms     last
+    0.014     free/off     0.318   0.365   0.337     linear regime: nothing
+    0.139     free         1.000   0.365   0.930
+    0.139     zero         0.317   0.365   0.337     filter bank: nothing
+    1.389     free         1.000   0.648   1.000
+    1.389     zero         0.317   0.365   0.337     filter bank: still nothing
+
+Two conditions are required, and neither alone suffices:
+
+  * **recurrence** - with W_rec = 0 the network is at chance at EVERY amplitude,
+    which is the prediction above confirmed;
+  * **amplitude** - with states of order 0.01 the tanh is linear to a part in
+    400, and a linear recurrent network is still just a filter bank.
+
+The control that falsifies is therefore the ARCHITECTURE (W_rec = 0), not the
+pooling. `rms` is only chance-level while the system is linear; once the
+nonlinearity is engaged it converts biphase into power too, which is why rms
+climbs to 0.648 at large amplitude. That is a real effect, not a leak - the
+stimulus power spectrum is still matched, but the network's internal spectrum is
+not.
+
+This also means the frequency-diversity question and the phase question are one
+experiment: forming a product needs units at BOTH f and 2f, so heterogeneity is
+a precondition rather than an advantage.
+"""
+
+from __future__ import annotations
+
+import jax
+import jax.numpy as jnp
+import numpy as np
+
+TWOPI = 2 * jnp.pi
+
+# THREE classes, evenly spaced. The count is derived, not chosen for convenience.
+#
+# The only DC (time-averaged) terms a nonlinearity can produce from tones at f
+# and 2f are those where the frequencies cancel: a copies of the fundamental and
+# b of the harmonic with a + 2b = 0. For an ODD nonlinearity such as tanh the
+# total order |a| + |b| = 3|b| must be odd, so b = +-1 (order 3) or b = +-3
+# (order 9), giving DC terms proportional to sin(psi) and sin(3*psi).
+#
+# With four evenly spaced biphases (0, pi/2, pi, 3pi/2) both of those are
+# ZERO for psi = 0 and psi = pi, so those two classes are indistinguishable to
+# anything reading a time average, and the ceiling is 75% rather than 100%. It
+# would look like a partial failure of the model when it is a property of the
+# stimulus set.
+#
+# Three evenly spaced values give sin(psi) = 0, +0.866, -0.866: all distinct.
+DEFAULT_BIPHASES = (0.0, 2 * np.pi / 3, 4 * np.pi / 3)
+
+
+def homogeneous_bands(n_osc: int, f_lo: float, f_hi: float) -> jnp.ndarray:
+    """Every unit at the geometric mean of the band.
+
+    The matched control for `log_spaced_bands`: same unit count, therefore the
+    same parameter count exactly, and the same mean frequency in log space. The
+    only thing that differs is the spread, which is the variable under test.
+
+    Geometric rather than arithmetic mean because frequency is perceived and
+    behaves multiplicatively - the midpoint of 1 and 100 Hz is 10, not 50.5.
+    """
+    return jnp.full((n_osc,), float(np.sqrt(f_lo * f_hi)), dtype=jnp.float32)
+
+
+def freq_batch(key, n, classes=(8.0, 32.0, 150.0), n_steps=20000, dt=5e-5,
+               noise=0.3):
+    """Noisy sinusoid at one of `classes` Hz, random phase. -> (L, n, 1), (n,)."""
+    k_y, k_p, k_n = jax.random.split(key, 3)
+    classes = jnp.asarray(classes, jnp.float32)
+
+    y = jax.random.randint(k_y, (n,), 0, len(classes))
+    phase = jax.random.uniform(k_p, (n,)) * TWOPI
+    t = jnp.arange(1, n_steps + 1) * dt
+
+    x = jnp.sin(TWOPI * classes[y][None, :] * t[:, None] + phase[None, :])
+    x = x + noise * jax.random.normal(k_n, (n_steps, n))
+    return x[..., None], y
+
+
+def biphase_batch(key, n, f_hz=10.0, n_steps=400, dt=2.5e-3,
+                  biphases=DEFAULT_BIPHASES, noise=0.1, amps=(1.0, 1.0)):
+    """Two tones at f and 2f; the class is their biphase. -> (L, n, 1), (n,).
+
+    Amplitudes are FIXED, not drawn - that is what keeps the power spectrum
+    identical across classes and makes the rms result a proof rather than an
+    observation. Do not randomise them without re-running
+    `tests/test_tasks.py::test_power_spectrum_is_matched_across_classes`.
+
+    Noise is additive white, so it raises the floor equally for every class and
+    cannot leak label information either.
+    """
+    k_y, k_p, k_n = jax.random.split(key, 3)
+    psi_values = jnp.asarray(biphases, jnp.float32)
+    a1, a2 = amps
+
+    y = jax.random.randint(k_y, (n,), 0, len(psi_values))
+    p = jax.random.uniform(k_p, (n,)) * TWOPI          # global phase, per example
+    psi = psi_values[y]                                # the label, as a phase
+    t = jnp.arange(1, n_steps + 1) * dt
+
+    fundamental = a1 * jnp.sin(TWOPI * f_hz * t[:, None] + p[None, :])
+    # The 2*p is essential: it is what makes psi invariant to a time shift.
+    harmonic = a2 * jnp.sin(TWOPI * 2 * f_hz * t[:, None] + 2 * p[None, :]
+                            + psi[None, :])
+
+    x = fundamental + harmonic + noise * jax.random.normal(k_n, (n_steps, n))
+    return x[..., None], y
+
+
+def power_spectrum_by_class(key, n_per_class=256, **kw):
+    """Mean power spectrum of each biphase class, for validity checking.
+
+    Returns (freqs_hz, power) with power of shape (n_classes, n_freqs). If these
+    rows are not equal to within sampling error, the task leaks the label into
+    power and the rms condition stops being a control.
+    """
+    biphases = kw.get("biphases", DEFAULT_BIPHASES)
+    dt = kw.get("dt", 2.5e-3)
+
+    rows = []
+    for i in range(len(biphases)):
+        # One class at a time, by passing a single-element biphase tuple.
+        single = dict(kw, biphases=(biphases[i],))
+        x, _ = biphase_batch(key, n_per_class, **single)
+        spec = np.abs(np.fft.rfft(np.asarray(x)[:, :, 0], axis=0)) ** 2
+        rows.append(spec.mean(axis=1))
+
+    freqs = np.fft.rfftfreq(np.asarray(x).shape[0], dt)
+    return freqs, np.stack(rows)
+
+
+# np.angle measures phase against a COSINE; biphase_batch builds the stimulus
+# from SINES. Since sin(a) = cos(a - pi/2), each measured phase is short by pi/2,
+# and the biphase combination phi2 - 2*phi1 therefore carries a constant offset:
+#
+#   phi1 = p - pi/2                      phi2 = 2p + psi - pi/2
+#   phi2 - 2*phi1 = psi + pi/2
+#
+# Subtracting it is the difference between recovering the biphase you generated
+# and recovering one rotated by a quarter turn. A constant phase offset from a
+# convention mismatch is one of the documented ways the cross-frequency-coupling
+# literature produces spurious results, so it is worth being explicit rather than
+# tuning a threshold until a test passes.
+_SIN_TO_COS_BIPHASE_OFFSET = np.pi / 2
+
+
+def biphase_of(signal: np.ndarray, f_hz: float, dt: float) -> float:
+    """Recover psi from a signal built by `biphase_batch`, for diagnostics.
+
+    Returns the value in the SINE convention, so that
+    `biphase_of(biphase_batch(..., biphases=(psi,))) == psi`.
+
+    Useful as a check that the stimulus carries what it claims to, and as the
+    measurement to apply to the network's own units when asking whether
+    cross-frequency coupling has emerged internally.
+    """
+    n = len(signal)
+    spec = np.fft.rfft(signal)
+    freqs = np.fft.rfftfreq(n, dt)
+    i1 = int(np.argmin(np.abs(freqs - f_hz)))
+    i2 = int(np.argmin(np.abs(freqs - 2 * f_hz)))
+    raw = np.angle(spec[i2]) - 2 * np.angle(spec[i1])
+    return float(raw - _SIN_TO_COS_BIPHASE_OFFSET) % (2 * np.pi)
