@@ -1,0 +1,188 @@
+{
+  "config": {
+    "task": "biphase",
+    "n_osc": 24,
+    "steps": 60,
+    "batch": 64,
+    "lr": 0.003,
+    "zeta": 0.05,
+    "w_scale": 3.0,
+    "seeds": 2,
+    "n_steps": 200,
+    "dt": 0.0025,
+    "f_hz": 10.0,
+    "noise": 0.1,
+    "eval_n": 256,
+    "pools": [
+      "rms",
+      "meanrms"
+    ],
+    "quick": true,
+    "tag": null
+  },
+  "n_classes": 3,
+  "f_lo": 2.0,
+  "f_hi": 40.0,
+  "records": [
+    {
+      "pool": "rms",
+      "omega": "heterogeneous",
+      "recurrence": "free",
+      "seed": 0,
+      "acc": 0.2890625,
+      "final_loss": 1.1056714057922363,
+      "gnorm_final": 0.3022705912590027,
+      "secs": 6.194231986999512
+    },
+    {
+      "pool": "rms",
+      "omega": "heterogeneous",
+      "recurrence": "free",
+      "seed": 1,
+      "acc": 0.41796875,
+      "final_loss": 1.1057088375091553,
+      "gnorm_final": 0.3475242853164673,
+      "secs": 6.485989809036255
+    },
+    {
+      "pool": "rms",
+      "omega": "heterogeneous",
+      "recurrence": "off",
+      "seed": 0,
+      "acc": 0.2890625,
+      "final_loss": 1.105652093887329,
+      "gnorm_final": 0.3024108111858368,
+      "secs": 6.387960433959961
+    },
+    {
+      "pool": "rms",
+      "omega": "heterogeneous",
+      "recurrence": "off",
+      "seed": 1,
+      "acc": 0.41796875,
+      "final_loss": 1.105743408203125,
+      "gnorm_final": 0.34764033555984497,
+      "secs": 6.399657964706421
+    },
+    {
+      "pool": "rms",
+      "omega": "homogeneous",
+      "recurrence": "free",
+      "seed": 0,
+      "acc": 0.35546875,
+      "final_loss": 1.1005325317382812,
+      "gnorm_final": 0.3312423825263977,
+      "secs": 6.491915464401245
+    },
+    {
+      "pool": "rms",
+      "omega": "homogeneous",
+      "recurrence": "free",
+      "seed": 1,
+      "acc": 0.375,
+      "final_loss": 1.0973702669143677,
+      "gnorm_final": 0.556077778339386,
+      "secs": 6.4589903354644775
+    },
+    {
+      "pool": "rms",
+      "omega": "homogeneous",
+      "recurrence": "off",
+      "seed": 0,
+      "acc": 0.35546875,
+      "final_loss": 1.1005524396896362,
+      "gnorm_final": 0.33114945888519287,
+      "secs": 6.445645332336426
+    },
+    {
+      "pool": "rms",
+      "omega": "homogeneous",
+      "recurrence": "off",
+      "seed": 1,
+      "acc": 0.375,
+      "final_loss": 1.0973083972930908,
+      "gnorm_final": 0.5544690489768982,
+      "secs": 6.487485885620117
+    },
+    {
+      "pool": "meanrms",
+      "omega": "heterogeneous",
+      "recurrence": "free",
+      "seed": 0,
+      "acc": 0.2890625,
+      "final_loss": 1.1041885614395142,
+      "gnorm_final": 0.26724639534950256,
+      "secs": 5.344221830368042
+    },
+    {
+      "pool": "meanrms",
+      "omega": "heterogeneous",
+      "recurrence": "free",
+      "seed": 1,
+      "acc": 0.30078125,
+      "final_loss": 1.099633812904358,
+      "gnorm_final": 0.28974661231040955,
+      "secs": 6.3679211139678955
+    },
+    {
+      "pool": "meanrms",
+      "omega": "heterogeneous",
+      "recurrence": "off",
+      "seed": 0,
+      "acc": 0.2890625,
+      "final_loss": 1.104237675666809,
+      "gnorm_final": 0.26725926995277405,
+      "secs": 6.536919116973877
+    },
+    {
+      "pool": "meanrms",
+      "omega": "heterogeneous",
+      "recurrence": "off",
+      "seed": 1,
+      "acc": 0.30078125,
+      "final_loss": 1.0996946096420288,
+      "gnorm_final": 0.2897503077983856,
+      "secs": 6.610036611557007
+    },
+    {
+      "pool": "meanrms",
+      "omega": "homogeneous",
+      "recurrence": "free",
+      "seed": 0,
+      "acc": 0.296875,
+      "final_loss": 1.1013526916503906,
+      "gnorm_final": 0.36144644021987915,
+      "secs": 6.788608551025391
+    },
+    {
+      "pool": "meanrms",
+      "omega": "homogeneous",
+      "recurrence": "free",
+      "seed": 1,
+      "acc": 0.375,
+      "final_loss": 1.0965256690979004,
+      "gnorm_final": 0.47783711552619934,
+      "secs": 6.674976110458374
+    },
+    {
+      "pool": "meanrms",
+      "omega": "homogeneous",
+      "recurrence": "off",
+      "seed": 0,
+      "acc": 0.296875,
+      "final_loss": 1.1013327836990356,
+      "gnorm_final": 0.36115819215774536,
+      "secs": 6.516840219497681
+    },
+    {
+      "pool": "meanrms",
+      "omega": "homogeneous",
+      "recurrence": "off",
+      "seed": 1,
+      "acc": 0.37890625,
+      "final_loss": 1.096511721611023,
+      "gnorm_final": 0.47757208347320557,
+      "secs": 6.136110067367554
+    }
+  ]
+}

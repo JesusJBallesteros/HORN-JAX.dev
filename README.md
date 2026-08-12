@@ -76,6 +76,8 @@ so the damage is done where the dynamics live, and a substrate-adapted readout i
 
 ![readout precision](results/readout_precision_biphase.png)
 
+![readout precision sMINST](results/readout_precision_smnist.png)
+
 ## Layout
 
 ```text

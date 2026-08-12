@@ -1,0 +1,99 @@
+{
+  "task": "smnist",
+  "acc_float": 0.861,
+  "chance": 0.1,
+  "scales": [
+    1.0130298137664795,
+    25.201847076416016
+  ],
+  "records": [
+    {
+      "bits": 1,
+      "acc_orig": 0.117,
+      "acc_ridge": 0.142,
+      "agreement": 0.1275,
+      "acc_sampled": 0.2595,
+      "acc_sampled_ridge": 0.826
+    },
+    {
+      "bits": 2,
+      "acc_orig": 0.191,
+      "acc_ridge": 0.45,
+      "agreement": 0.1995,
+      "acc_sampled": 0.2955,
+      "acc_sampled_ridge": 0.848
+    },
+    {
+      "bits": 3,
+      "acc_orig": 0.3085,
+      "acc_ridge": 0.696,
+      "agreement": 0.3035,
+      "acc_sampled": 0.5465,
+      "acc_sampled_ridge": 0.876
+    },
+    {
+      "bits": 4,
+      "acc_orig": 0.362,
+      "acc_ridge": 0.772,
+      "agreement": 0.3585,
+      "acc_sampled": 0.7965,
+      "acc_sampled_ridge": 0.884
+    },
+    {
+      "bits": 5,
+      "acc_orig": 0.6825,
+      "acc_ridge": 0.846,
+      "agreement": 0.7155,
+      "acc_sampled": 0.8535,
+      "acc_sampled_ridge": 0.888
+    },
+    {
+      "bits": 6,
+      "acc_orig": 0.845,
+      "acc_ridge": 0.872,
+      "agreement": 0.9295,
+      "acc_sampled": 0.857,
+      "acc_sampled_ridge": 0.878
+    },
+    {
+      "bits": 8,
+      "acc_orig": 0.8625,
+      "acc_ridge": 0.856,
+      "agreement": 0.9885,
+      "acc_sampled": 0.861,
+      "acc_sampled_ridge": 0.88
+    },
+    {
+      "bits": 10,
+      "acc_orig": 0.861,
+      "acc_ridge": 0.876,
+      "agreement": 0.9935,
+      "acc_sampled": 0.8615,
+      "acc_sampled_ridge": 0.878
+    },
+    {
+      "bits": 12,
+      "acc_orig": 0.861,
+      "acc_ridge": 0.882,
+      "agreement": 0.9965,
+      "acc_sampled": 0.8605,
+      "acc_sampled_ridge": 0.88
+    },
+    {
+      "bits": 14,
+      "acc_orig": 0.86,
+      "acc_ridge": 0.882,
+      "agreement": 0.9965,
+      "acc_sampled": 0.8605,
+      "acc_sampled_ridge": 0.88
+    },
+    {
+      "bits": 16,
+      "acc_orig": 0.8605,
+      "acc_ridge": 0.884,
+      "agreement": 0.9975,
+      "acc_sampled": 0.8605,
+      "acc_sampled_ridge": 0.88
+    }
+  ]
+}

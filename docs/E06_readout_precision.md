@@ -32,6 +32,21 @@ the float model (the paper's metric).
 
 ![readout precision](../results/readout_precision_biphase.png)
 
+bits  in-loop:   orig  ridge  agree   sampled:   orig  ridge
+   1            0.117  0.142  0.128             0.260  0.826
+   2            0.191  0.450  0.200             0.295  0.848
+   3            0.308  0.696  0.303             0.546  0.876
+   4            0.362  0.772  0.358             0.796  0.884
+   5            0.682  0.846  0.716             0.854  0.888
+   6            0.845  0.872  0.929             0.857  0.878
+   8            0.863  0.856  0.989             0.861  0.880
+  10            0.861  0.876  0.994             0.862  0.878
+  12            0.861  0.882  0.997             0.861  0.880
+  14            0.860  0.882  0.997             0.861  0.880
+  16            0.861  0.884  0.998             0.861  0.880
+
+![readout precision sMINST](results/readout_precision_smnist.png)
+
 Three separate facts, one figure:
 
 1. **The information survives to 3 bits.** A retrained linear readout classifies

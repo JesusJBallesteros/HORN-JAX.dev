@@ -64,7 +64,7 @@ def log_spaced_bands(n_osc, f_lo, f_hi):
 # Construction
 
 def init_net(key, in_size, n_osc, n_out, f_hz, zeta, w_scale=0.1, readout_scale=1.0,
-             input_gain="normalised", pool="rms"):
+             input_gain="normalised", rec_gain="flat", pool="rms"):
     """Build a one-layer HORN plus linear readout.
 
     f_hz : scalar or (n_osc,) array, in HERTZ.
@@ -80,6 +80,22 @@ def init_net(key, in_size, n_osc, n_out, f_hz, zeta, w_scale=0.1, readout_scale=
                       of order 1e-6. The readout then sees nothing, the softmax
                       is uniform, and no gradient flows.
       "flat"       - plain W_in. Just so the failure can be reproduced.
+
+    rec_gain: THE SAME QUESTION, ASKED OF THE RECURRENT PATH.
+      "flat"       - plain W_rec, scaled only by w_scale/sqrt(n_osc). This is the
+                      historical default and it has a measured consequence: with
+                      input_gain="normalised" the external drive outweighs the
+                      recurrent drive by ~5000:1 at 40 Hz, so the network is
+                      effectively FEEDFORWARD. Zeroing W_rec then changes the
+                      logits by 4e-4 relative, and any experiment whose
+                      independent variable is "recurrence on/off" measures
+                      nothing. Kept as the default so earlier results reproduce.
+      "normalised" - apply the same 2*zeta*omega^2 factor to W_rec. The
+                      normalisation exists so that a DRIVE produces an O(1)
+                      response; recurrent input is a drive, so it belongs here
+                      too. This is what makes recurrence actually matter.
+
+    `tests/test_model.py::test_drive_balance` records the ratio for both.
     """
     k_in, k_rec, k_out = jax.random.split(key, 3)
 
@@ -87,17 +103,29 @@ def init_net(key, in_size, n_osc, n_out, f_hz, zeta, w_scale=0.1, readout_scale=
     zeta = jnp.broadcast_to(jnp.asarray(zeta, jnp.float32), (n_osc,))
 
     omega = TWOPI * f_hz
+    # 1/(2*zeta*omega^2) is the on-resonance steady-state gain of the oscillator,
+    # so multiplying a drive by its inverse cancels the collapse exactly.
+    resonance_gain = (2.0 * zeta * omega ** 2)[:, None]
+
     if input_gain == "normalised":
-        gain = (2.0 * zeta * omega ** 2)[:, None]   # cancels the 1/(2*zeta*w^2) collapse
+        gain_in = resonance_gain
     elif input_gain == "flat":
-        gain = 1.0
+        gain_in = 1.0
     else:
         raise ValueError(f"unknown input_gain: {input_gain}")
 
+    if rec_gain == "normalised":
+        gain_rec = resonance_gain
+    elif rec_gain == "flat":
+        gain_rec = 1.0
+    else:
+        raise ValueError(f"unknown rec_gain: {rec_gain}")
+
     horn = HORNParams(
-        W_in=jax.random.normal(k_in, (n_osc, in_size)) * w_scale * gain,
+        W_in=jax.random.normal(k_in, (n_osc, in_size)) * w_scale * gain_in,
         # 1/sqrt(fan-in) keeps total recurrent drive stable as the layer grows
-        W_rec=jax.random.normal(k_rec, (n_osc, n_osc)) * (w_scale / jnp.sqrt(n_osc)),
+        W_rec=(jax.random.normal(k_rec, (n_osc, n_osc))
+               * (w_scale / jnp.sqrt(n_osc)) * gain_rec),
         log_omega=jnp.log(omega),          # rad/s, log-stored for positivity
         log_zeta=jnp.log(zeta),
     )

@@ -68,7 +68,7 @@ def build(key, cfg, omega_kind, recurrence):
     params = init_net(key, 1, cfg["n_osc"], cfg["n_classes"],
                       f_hz=bands(cfg["n_osc"], cfg["f_lo"], cfg["f_hi"]),
                       zeta=cfg["zeta"], pool=cfg["pool_widest"],
-                      w_scale=cfg["w_scale"])
+                      w_scale=cfg["w_scale"], rec_gain=cfg["rec_gain"])
 
     if recurrence == "off":
         # Zero AND frozen (see the caller) = a bank of genuinely independent
@@ -91,6 +91,11 @@ def main():
     # 0.1 (the model default) leaves the recurrent tanh linear and the biphase
     # mechanism unavailable - see probe_mechanism.py. 3.0 gives rms|x| ~ 0.4.
     ap.add_argument("--w-scale", type=float, default=3.0)
+    # "flat" reproduces the run that found nothing: with input_gain="normalised"
+    # the external drive is ~5000x the recurrent drive, so W_rec on/off changes
+    # the logits by 4e-4 and the recurrence variable is inert. "normalised"
+    # applies the same 2*zeta*omega^2 factor to W_rec. Run both, in that order.
+    ap.add_argument("--rec-gain", choices=["flat", "normalised"], default="normalised")
     ap.add_argument("--seeds", type=int, default=5)
     ap.add_argument("--n-steps", type=int, default=400, help="sequence length L")
     ap.add_argument("--dt", type=float, default=2.5e-3)
@@ -130,7 +135,8 @@ def main():
           f"{binomial_sd(1/n_classes, args.eval_n):.4f}\n")
 
     cfg = dict(n_osc=args.n_osc, n_classes=n_classes, f_lo=f_lo, f_hi=f_hi,
-               zeta=args.zeta, w_scale=args.w_scale, pool_widest="meanrms")
+               zeta=args.zeta, w_scale=args.w_scale, rec_gain=args.rec_gain,
+               pool_widest="meanrms")
 
     records = []
     grid = list(itertools.product(args.pools, ["heterogeneous", "homogeneous"],
@@ -158,7 +164,8 @@ def main():
     print(f"\ntotal {time.time() - t_start:.0f}s")
     summarise(records, n_classes, args.eval_n)
 
-    tag = args.tag or f"{args.task}_n{args.n_osc}_L{args.n_steps}"
+    tag = args.tag or (f"{args.task}_n{args.n_osc}_L{args.n_steps}"
+                       f"_rec{args.rec_gain}")
     out = results(f"diversity_{tag}.json")
     out.write_text(json.dumps({"config": vars(args), "n_classes": n_classes,
                                "f_lo": f_lo, "f_hi": f_hi,

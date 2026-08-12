@@ -105,3 +105,60 @@ def test_log_spaced_bands_endpoints():
     assert jnp.allclose(b[0], 2.0) and jnp.allclose(b[-1], 32.0)
     ratios = b[1:] / b[:-1]
     assert jnp.allclose(ratios, ratios[0])      # constant ratio = log spacing
+
+
+def test_drive_balance_and_recurrence_leverage():
+    """The bug this exists to prevent: an inert independent variable.
+
+    `input_gain="normalised"` multiplies W_in by 2*zeta*omega^2. Nothing
+    multiplied W_rec, so at 40 Hz the external drive outweighed the recurrent
+    drive by ~5000:1 and the network was effectively feedforward. An experiment
+    whose variable was "recurrence on/off" then compared a network against
+    itself: zeroing W_rec moved the logits by 4e-4 relative, and the sweep
+    returned bit-identical accuracies for conditions that were supposed to
+    differ.
+
+    Nothing here asserts that "flat" is wrong - it is kept as the default so
+    earlier results reproduce. What is asserted is that the two settings are
+    genuinely different, and that "normalised" gives recurrence enough leverage
+    to be worth sweeping over.
+    """
+    import numpy as np
+    from horn.model import forward, log_spaced_bands, usable_band
+
+    L, dt, n_osc = 200, 2.5e-3, 32
+    f_lo, f_hi = usable_band(L, dt)
+    inputs = jax.random.normal(jax.random.PRNGKey(3), (L, 8, 1))
+
+    def leverage(rec_gain):
+        p = init_net(jax.random.PRNGKey(0), 1, n_osc, 3,
+                     f_hz=log_spaced_bands(n_osc, f_lo, f_hi), zeta=0.05,
+                     pool="meanrms", w_scale=3.0, rec_gain=rec_gain)
+        zeroed = p._replace(horn=p.horn._replace(
+            W_rec=jnp.zeros_like(p.horn.W_rec)))
+        a = forward(p, inputs, dt, "meanrms")
+        b = forward(zeroed, inputs, dt, "meanrms")
+        rel = float(jnp.abs(a - b).max() / jnp.abs(a).max())
+        ratio = float(jnp.abs(p.horn.W_in).mean() / jnp.abs(p.horn.W_rec).mean())
+        return rel, ratio
+
+    flat_rel, flat_ratio = leverage("flat")
+    norm_rel, norm_ratio = leverage("normalised")
+
+    # The historical default really is inert - this is the measurement, recorded
+    # so that a future change which silently "fixes" it is visible as a failure.
+    assert flat_rel < 1e-2, f"flat leverage {flat_rel:.2e} unexpectedly large"
+
+    # The fix must give recurrence real influence.
+    assert norm_rel > 0.05, (
+        f"rec_gain='normalised' leverage is only {norm_rel:.2e}; recurrence is "
+        "still inert and a sweep over it would measure nothing")
+    assert norm_rel > 10 * flat_rel, "normalised is not meaningfully different from flat"
+    assert norm_ratio < flat_ratio / 10, "W_rec was not rescaled"
+
+
+def test_rec_gain_rejects_unknown_values():
+    from horn.model import log_spaced_bands
+    with pytest.raises(ValueError, match="rec_gain"):
+        init_net(jax.random.PRNGKey(0), 1, 8, 3,
+                 f_hz=log_spaced_bands(8, 1.0, 10.0), zeta=0.1, rec_gain="nope")

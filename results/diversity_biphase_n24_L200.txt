@@ -1,0 +1,35 @@
+jax 0.11.0 on [CudaDevice(id=0)]
+task=biphase  L=200  dt=2.50 ms  T=0.50 s
+usable band 2.00-40.0 Hz (ratio 20)
+stimulus needs (10.0, 20.0) Hz -> all inside
+chance = 0.333, eval sd at n=256 is 0.0295
+
+[  1/16]     rms | omega heterogeneous | W_rec free | seed 0 -> acc 0.289  (6s)
+[  2/16]     rms | omega heterogeneous | W_rec free | seed 1 -> acc 0.418  (6s)
+[  3/16]     rms | omega heterogeneous | W_rec off  | seed 0 -> acc 0.289  (6s)
+[  4/16]     rms | omega heterogeneous | W_rec off  | seed 1 -> acc 0.418  (6s)
+[  5/16]     rms | omega homogeneous   | W_rec free | seed 0 -> acc 0.355  (6s)
+[  6/16]     rms | omega homogeneous   | W_rec free | seed 1 -> acc 0.375  (6s)
+[  7/16]     rms | omega homogeneous   | W_rec off  | seed 0 -> acc 0.355  (6s)
+[  8/16]     rms | omega homogeneous   | W_rec off  | seed 1 -> acc 0.375  (6s)
+[  9/16] meanrms | omega heterogeneous | W_rec free | seed 0 -> acc 0.289  (5s)
+[ 10/16] meanrms | omega heterogeneous | W_rec free | seed 1 -> acc 0.301  (6s)
+[ 11/16] meanrms | omega heterogeneous | W_rec off  | seed 0 -> acc 0.289  (7s)
+[ 12/16] meanrms | omega heterogeneous | W_rec off  | seed 1 -> acc 0.301  (7s)
+[ 13/16] meanrms | omega homogeneous   | W_rec free | seed 0 -> acc 0.297  (7s)
+[ 14/16] meanrms | omega homogeneous   | W_rec free | seed 1 -> acc 0.375  (7s)
+[ 15/16] meanrms | omega homogeneous   | W_rec off  | seed 0 -> acc 0.297  (7s)
+[ 16/16] meanrms | omega homogeneous   | W_rec off  | seed 1 -> acc 0.379  (6s)
+
+total 109s
+
+    pool          omega  W_rec   mean    sd     sigma above chance
+--------------------------------------------------------------------
+     rms  heterogeneous   free   0.354  0.064      0.7
+     rms  heterogeneous    off   0.354  0.064      0.7
+     rms    homogeneous   free   0.365  0.010      1.1
+     rms    homogeneous    off   0.365  0.010      1.1
+ meanrms  heterogeneous   free   0.295  0.006     -1.3
+ meanrms  heterogeneous    off   0.295  0.006     -1.3
+ meanrms    homogeneous   free   0.336  0.039      0.1
+ meanrms    homogeneous    off   0.338  0.041      0.2
