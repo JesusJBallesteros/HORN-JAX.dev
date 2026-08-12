@@ -25,6 +25,13 @@ oscillator recurrent network*, arXiv:2509.04064. Reference implementation: `brai
   Negative damping is exponential blow-up.
 - **Readout reads `(x, v/omega)`, not `(x, v)`.** Since v ~ omega*x, raw velocity is ~600x
   position at 100 Hz and would dominate the readout purely through units.
+- **Gain normalisation must be applied to every drive, not just the external one.** The
+  factor `2*zeta*omega^2` exists so that a drive produces an O(1) response. Recurrent input
+  is a drive. Applying it to `W_in` alone leaves the network feedforward in all but name -
+  see `rec_gain` in `init_net` and the State entry below.
+- **Before sweeping over a variable, measure that it moves the output.** One forward pass
+  with the variable switched off, compared against one with it on. A relative change below
+  ~1e-2 means the sweep will return noise no matter how many seeds it averages.
 
 ## Findings so far (notebook 01, then confirmed in 02)
 
@@ -65,9 +72,11 @@ horn/tasks.py           freq_batch (plumbing check), biphase_batch (the phase qu
 horn/training.py        train / evaluate, freeze_osc and freeze_rec controls
 horn/data.py            MNIST: IDX parsing, npz cache. Raises rather than faking data.
 horn/paths.py           REPO / DATA_DIR / RESULTS_DIR, anchored to the package
+horn/report.py          Report(): tees stdout to results/<name>.txt and saves matching
+                        .json/.png with a provenance header (timestamp + commit hash)
 experiments/            probe_mechanism (separability at init), run_diversity (the grid),
                         readout_precision (in-loop vs sampled quantisation, E06)
-tests/                  20 tests. test_dynamics = physics; test_model = plumbing;
+tests/                  32 tests. test_dynamics = physics; test_model = plumbing;
                         test_tasks = task construction. See TESTING.md.
 docs/                   experiment log, one page per experiment: E01-E06 + index
 notebooks/01_test_core  validation against closed-form solutions
@@ -91,8 +100,21 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
 - [x] Readout precision (docs/E06): in-loop quantisation, info survives to 3 bits with a
       retrained ridge, float readout collapses <14 bits, agreement bottoms at 0.26 vs the
       analog paper's 0.28. Sampled-only quantisation is nearly harmless.
-- [ ] Readout precision on sMNIST (next in line, see below)
-- [ ] Biphase trained grid (opportunistic, see below)
+- [x] Readout precision on sMNIST: float32 0.861, agreement bottoms at 0.13 and passes
+      through 0.30 at 3 bits against the analog paper's 0.284; retrained ridge lifts 3-bit
+      accuracy 0.308 -> 0.696. Results in `results/readout_precision_smnist.{txt,json,png}`.
+      NOT yet written into docs/E06.
+- [x] **`rec_gain` fix.** `input_gain="normalised"` multiplied W_in by `2*zeta*omega^2` and
+      nothing multiplied W_rec, so external drive outweighed recurrent drive ~5000:1 and the
+      network was effectively FEEDFORWARD. Zeroing W_rec changed the logits by 4e-4, so
+      "recurrence on/off" was an inert variable and the first biphase grid returned
+      bit-identical accuracies for conditions meant to differ. `init_net(rec_gain=...)` now
+      offers "flat" (default, reproduces the old runs) and "normalised" (same factor applied
+      to W_rec). Measured: drive ratio 6968:1 -> 8:1, recurrence leverage 3.6e-3 -> 0.37.
+      Guarded by `test_drive_balance_and_recurrence_leverage`.
+- [x] Biphase grid re-run under both gains, artefacts named by condition:
+      `results/diversity_biphase_n24_L200_recflat.*` and `..._recnormalised.*`, plus
+      `results/probe_mechanism_rec_flat_vs_norm.{txt,json,png}`. NOT yet interpreted.
 - [ ] Stacked layers
 - [ ] Nested banded omega with cross-frequency modulation vs flat heterogeneity, matched
       parameters, on a long-sequence task (E07 in docs/, designed but not started)
@@ -101,31 +123,45 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
 
 ## Next in line, explicitly
 
-1. **Readout precision on sMNIST.** Priority one: it is the task the analog paper used,
-   so its figure replaces the biphase one as the README headline once it exists.
+1. **Interpret the new results and write them into the docs. THE NEXT TASK.**
 
-       python experiments/readout_precision.py --task smnist
+   All runs are done and every artefact is on disk. Nothing further needs to be executed;
+   what is missing is the reading of them. Files awaiting interpretation:
 
-   Needs the MNIST download (blocked in some sandboxes; runs fine on a normal machine,
-   caches to `data/mnist.npz`). ~1 min train on GPU, a few min on CPU. Output lands in
-   `results/readout_precision_smnist.{json,png}`. Then: swap the figure into README and
-   docs/E06, note both tasks in the E06 table, and update the "one task, one seed" caveat.
-   Expected shape: same as biphase (float readout collapses, retrained ridge recovers,
-   sampled-only nearly harmless); if the collapse threshold differs by many bits, that
-   difference is itself worth a sentence (task coding fragility).
+   | file | what it is |
+   |---|---|
+   | `results/readout_precision_smnist.{txt,json,png}` | E06 on the paper's own task |
+   | `results/probe_mechanism_rec_flat_vs_norm.{txt,json,png}` | separability at init, both gains |
+   | `results/diversity_biphase_n24_L200_recflat.{json,png}` | grid under the inert variable |
+   | `results/diversity_biphase_n24_L200_recnormalised.{json,png}` | grid after the fix |
 
-2. **Biphase trained grid.** Opportunistic, GPU box, not blocking anything.
+   What that means concretely:
 
-       python experiments/run_diversity.py --quick    # ~2 min smoke test first
-       python experiments/run_diversity.py            # only if quick separates
+   - **docs/E06** — add the sMNIST run beside the biphase one. The comparison is the
+     point: sMNIST's float readout recovers by ~6 bits while biphase needs ~14, so
+     phase-coded information is MORE fragile under in-loop quantisation, not less. That
+     inverts the E08 hypothesis and should be stated as an inversion, with the mechanism,
+     not buried. Also note agreement 0.303 at 3 bits against the paper's 0.284.
+   - **docs/E05** — add the `rec_gain` story and the two grids. The honest shape is: the
+     at-init probe carries the sharp claim (W_rec=0 at chance everywhere), the trained grid
+     does not yet reproduce it, and the gap is readout conditioning rather than
+     representation. Say so.
+   - **A new docs/E00 or a section in docs/README.md** — the methodology lesson is worth
+     its own entry: an experiment whose independent variable moves the output by 4e-4 is
+     not a null result, it is a broken instrument, and the check that catches it
+     (`recurrence leverage`) costs one forward pass. This is the most transferable thing
+     in the repo.
+   - **README** — swap the headline figure to the sMNIST precision result, and update the
+     "honest limitations" section: sMNIST is now run, and the phase claim is supported at
+     initialisation but not yet through training.
 
-   Caution: at zeta=0.15 the resonances are broad (Q~3), so a homogeneous bank near the
-   geometric mean may also solve the task through the engaged tanh, and the grid would
-   come back mushy. Add a low-zeta condition (e.g. zeta=0.02) before trusting a null
-   result. If it is mushy anyway, write that into docs/E05 honestly; the at-init probe
-   already carries the sharp claim.
+   Known caveat to carry into the writing: the trained biphase grid is still at chance
+   under both gains, while ridge on standardised features at init reaches 1.000. Before
+   concluding anything about frequency diversity from that grid, note that the readout
+   does not standardise its pooled features, and 60 steps at n_osc=24 is a smoke test, not
+   an experiment. Do not report the `--quick` numbers as a null result on diversity.
 
-3. **Application side** (not in this repo): rewrite the cover letter sentence that says
+2. **Application side** (not in this repo): rewrite the cover letter sentence that says
    the falsifying experiment is "designed and waiting" to point at the E06 result
    instead, once the sMNIST variant confirms; the literature PDFs listed in the
    application folder's literature/README.md still need manual download.
