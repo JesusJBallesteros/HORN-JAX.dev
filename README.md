@@ -65,6 +65,17 @@ initialisation the probe already shows the sharp result. `W_rec = 0` is at chanc
 amplitude, while recurrence plus an engaged nonlinearity reaches 1.00. The trained
 heterogeneous-vs-homogeneous grid is the next run.
 
+**The readout is the fragile part, not the dynamics** ([E06](docs/E06_readout_precision.md)).
+The analog HORN paper found its digital readout agreeing with the hardware on only 28% of
+predictions, recoverable by retraining a linear readout. Reproduced here with state precision
+as the controlled variable: with the state quantised inside the recurrent loop, a retrained
+ridge readout still classifies perfectly at 3 bits, while the float-trained readout collapses
+below 14 bits and bottoms out at 26% agreement. Quantising only the observation barely hurts,
+so the damage is done where the dynamics live, and a substrate-adapted readout is worth about
+11 bits of state precision.
+
+![readout precision](results/readout_precision_biphase.png)
+
 ## Layout
 
 ```text
@@ -76,6 +87,7 @@ horn/data.py                     MNIST: IDX parsing, caching, no synthetic fallb
 horn/paths.py                    repo-anchored paths, so output never lands in the cwd
 experiments/probe_mechanism.py   separability at init: which pooling, which regime
 experiments/run_diversity.py     heterogeneous-vs-homogeneous grid on the biphase task
+experiments/readout_precision.py quantised state, in-loop vs sampled, readout recovery
 tests/test_dynamics.py           5 tests: physics against closed-form solutions
 tests/test_model.py              8 tests: shapes, gradients, plumbing
 tests/test_tasks.py              7 tests: task construction, matched spectra, no label leaks
@@ -168,11 +180,13 @@ MNIST downloads on first use and caches to `data/mnist.npz`.
 - [x] Frequency discrimination trained to ceiling
 - [x] Sequential MNIST, row-wise and pixel-wise
 - [x] Frozen vs learned (ω, ζ)
+- [x] Readout precision: the analog paper's readout collapse, reproduced and dissected
 - [ ] Biphase: trained heterogeneous-vs-homogeneous grid, where `rms` pooling must lose
+- [ ] Readout precision on sMNIST (`--task smnist`), the task the analog paper used
 - [ ] Stacked layers
 - [ ] Nested banded ω with cross-frequency modulation vs flat heterogeneity, matched parameters
-- [ ] Spiking readout: does phase coding degrade more gracefully than a continuous readout
-      under quantisation of the hidden state?
+- [ ] Spiking readout: does phase coding degrade more gracefully than a continuous readout?
+      E06 is the baseline to beat
 
 ## References
 

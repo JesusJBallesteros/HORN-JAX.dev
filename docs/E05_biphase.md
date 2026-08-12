@@ -21,16 +21,22 @@ of an untrained network, 3 classes, chance 0.333 (`experiments/probe_mechanism.p
 
 | rms\|x\| | W_rec | mean | rms | last | reading |
 |---|---|---|---|---|---|
-| 0.014 | free/off | 0.318 | 0.365 | 0.337 | linear regime: nothing |
-| 0.139 | free | 1.000 | 0.365 | 0.930 | recurrence + mild nonlinearity: solved |
-| 0.139 | zero | 0.317 | 0.365 | 0.337 | filter bank: nothing |
-| 1.389 | free | 1.000 | 0.648 | 1.000 | strongly driven: even rms climbs |
-| 1.389 | zero | 0.317 | 0.365 | 0.337 | filter bank: still nothing |
+| 0.028 | free/off | 0.323 | 0.365 | 0.320 | linear regime: nothing |
+| 0.279 | free | 1.000 | 0.372 | 0.687 | recurrence + mild nonlinearity: solved |
+| 0.279 | zero | 0.323 | 0.365 | 0.320 | filter bank: nothing |
+| 2.789 | free | 1.000 | 0.652 | 1.000 | strongly driven: even rms climbs |
+| 2.789 | zero | 0.323 | 0.365 | 0.320 | filter bank: still nothing |
 
 Two of three original predictions were wrong, in an informative way. The falsifying control
 is the **architecture** (`W_rec = 0` is at chance at every amplitude), not the pooling. Once
 the tanh is engaged the network converts biphase into internal power, so `rms` climbs to
 0.65: the stimulus spectrum is still matched, but the network's internal spectrum is not.
+
+*Provenance note.* The table was regenerated after two corrections: a normalisation bug in
+the probe's ridge estimator (a scaled bias column poisoned the normal equations and
+deflated some accuracies, notably `last` in the mid-amplitude row), and a drift between
+the quoted rms\|x\| values and what the current task code produces. The committed record
+is `results/probe_mechanism.txt`; the conclusions above are unchanged.
 
 **Status.** Probe done. The trained heterogeneous-vs-homogeneous grid
 (`experiments/run_diversity.py`) has not been run to completion; it is the next experiment,

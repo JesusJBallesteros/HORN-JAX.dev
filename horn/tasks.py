@@ -43,11 +43,11 @@ Held-out accuracy of a ridge readout on the pooled features of an UNTRAINED
 network, 3 classes, chance 0.333 (see `experiments/probe_mechanism.py`):
 
     rms|x|    W_rec        mean     rms     last
-    0.014     free/off     0.318   0.365   0.337     linear regime: nothing
-    0.139     free         1.000   0.365   0.930
-    0.139     zero         0.317   0.365   0.337     filter bank: nothing
-    1.389     free         1.000   0.648   1.000
-    1.389     zero         0.317   0.365   0.337     filter bank: still nothing
+    0.028     free/off     0.323   0.365   0.320     linear regime: nothing
+    0.279     free         1.000   0.372   0.687
+    0.279     zero         0.323   0.365   0.320     filter bank: nothing
+    2.789     free         1.000   0.652   1.000
+    2.789     zero         0.323   0.365   0.320     filter bank: still nothing
 
 Two conditions are required, and neither alone suffices:
 
@@ -59,7 +59,7 @@ Two conditions are required, and neither alone suffices:
 The control that falsifies is therefore the ARCHITECTURE (W_rec = 0), not the
 pooling. `rms` is only chance-level while the system is linear; once the
 nonlinearity is engaged it converts biphase into power too, which is why rms
-climbs to 0.648 at large amplitude. That is a real effect.
+climbs to 0.652 at large amplitude. That is a real effect.
 
 The stimulus power spectrum is still matched, but the network's internal spectrum 
 is not.

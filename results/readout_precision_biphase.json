@@ -1,0 +1,99 @@
+{
+  "task": "biphase",
+  "acc_float": 1.0,
+  "chance": 0.3333333333333333,
+  "scales": [
+    2.297758102416992,
+    205.38067626953125
+  ],
+  "records": [
+    {
+      "bits": 1,
+      "acc_orig": 0.2575,
+      "acc_ridge": 0.82,
+      "agreement": 0.2575,
+      "acc_sampled": 0.8358333333333333,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 2,
+      "acc_orig": 0.2575,
+      "acc_ridge": 0.83,
+      "agreement": 0.2575,
+      "acc_sampled": 0.8366666666666667,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 3,
+      "acc_orig": 0.2575,
+      "acc_ridge": 1.0,
+      "agreement": 0.2575,
+      "acc_sampled": 0.8416666666666667,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 4,
+      "acc_orig": 0.2575,
+      "acc_ridge": 0.9966666666666667,
+      "agreement": 0.2575,
+      "acc_sampled": 0.85,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 5,
+      "acc_orig": 0.2575,
+      "acc_ridge": 1.0,
+      "agreement": 0.2575,
+      "acc_sampled": 0.8641666666666666,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 6,
+      "acc_orig": 0.2575,
+      "acc_ridge": 0.99,
+      "agreement": 0.2575,
+      "acc_sampled": 0.8891666666666667,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 8,
+      "acc_orig": 0.2575,
+      "acc_ridge": 1.0,
+      "agreement": 0.2575,
+      "acc_sampled": 0.9733333333333334,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 10,
+      "acc_orig": 0.2775,
+      "acc_ridge": 1.0,
+      "agreement": 0.2775,
+      "acc_sampled": 1.0,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 12,
+      "acc_orig": 0.68,
+      "acc_ridge": 1.0,
+      "agreement": 0.68,
+      "acc_sampled": 1.0,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 14,
+      "acc_orig": 0.9816666666666667,
+      "acc_ridge": 1.0,
+      "agreement": 0.9816666666666667,
+      "acc_sampled": 1.0,
+      "acc_sampled_ridge": 1.0
+    },
+    {
+      "bits": 16,
+      "acc_orig": 1.0,
+      "acc_ridge": 1.0,
+      "agreement": 1.0,
+      "acc_sampled": 1.0,
+      "acc_sampled_ridge": 1.0
+    }
+  ]
+}

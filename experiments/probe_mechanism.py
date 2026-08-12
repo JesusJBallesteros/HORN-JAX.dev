@@ -64,16 +64,20 @@ def heldout_separability(feats, labels, n_classes, ridge=1e-2, seed=0):
     An upper bound on what any linear readout on these features could achieve,
     obtained without training the recurrent weights at all.
     """
-    F = np.concatenate([feats, np.ones((len(feats), 1))], 1)
-    F = F / (np.abs(F).std(0, keepdims=True) + 1e-9)
+    # Scale features FIRST, append the bias column after. Scaling a constant
+    # column of ones by its (zero) spread creates a 1e9 column that poisons
+    # the normal equations and deflates every accuracy this probe reports.
+    Fs = feats / (feats.std(0, keepdims=True) + 1e-9)
+    F = np.concatenate([Fs, np.ones((len(Fs), 1))], 1)
 
     idx = np.random.default_rng(seed).permutation(len(F))
     half = len(F) // 2
     tr, te = idx[:half], idx[half:]
 
     Y = np.eye(n_classes)[labels]
-    W = np.linalg.solve(F[tr].T @ F[tr] + ridge * half * np.eye(F.shape[1]),
-                        F[tr].T @ Y[tr])
+    A = np.concatenate([F[tr], np.sqrt(ridge * half) * np.eye(F.shape[1])])
+    B = np.concatenate([Y[tr], np.zeros((F.shape[1], n_classes))])
+    W = np.linalg.lstsq(A, B, rcond=None)[0]
     return float((np.argmax(F[te] @ W, 1) == labels[te]).mean())
 
 

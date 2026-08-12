@@ -65,10 +65,11 @@ horn/tasks.py           freq_batch (plumbing check), biphase_batch (the phase qu
 horn/training.py        train / evaluate, freeze_osc and freeze_rec controls
 horn/data.py            MNIST: IDX parsing, npz cache. Raises rather than faking data.
 horn/paths.py           REPO / DATA_DIR / RESULTS_DIR, anchored to the package
-experiments/            probe_mechanism (separability at init), run_diversity (the grid)
+experiments/            probe_mechanism (separability at init), run_diversity (the grid),
+                        readout_precision (in-loop vs sampled quantisation, E06)
 tests/                  20 tests. test_dynamics = physics; test_model = plumbing;
                         test_tasks = task construction. See TESTING.md.
-docs/                   experiment log, one page per experiment: E01-E05 + index
+docs/                   experiment log, one page per experiment: E01-E06 + index
 notebooks/01_test_core  validation against closed-form solutions
 notebooks/02_sequence_training  readout, training loop, sMNIST
 results/                curated figures and run records, committed on purpose
@@ -85,13 +86,53 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
 - [x] Frozen vs learned (omega, zeta): 0.872 vs 0.897; omega migrates down 38% median,
       zeta collapses 0.15 -> 0.007-0.061. See docs/E04.
 - [x] Biphase task built + probed at init: W_rec=0 at chance everywhere, recurrence +
-      engaged tanh -> 1.00. See docs/E05 and horn/tasks.py.
-- [ ] **Biphase trained grid, next. `python experiments/run_diversity.py` on a GPU box.**
+      engaged tanh -> 1.00. See docs/E05 and horn/tasks.py. NOTE: probe ridge had a
+      normalisation bug (scaled bias column); fixed, table regenerated, conclusions held.
+- [x] Readout precision (docs/E06): in-loop quantisation, info survives to 3 bits with a
+      retrained ridge, float readout collapses <14 bits, agreement bottoms at 0.26 vs the
+      analog paper's 0.28. Sampled-only quantisation is nearly harmless.
+- [ ] Readout precision on sMNIST (next in line, see below)
+- [ ] Biphase trained grid (opportunistic, see below)
 - [ ] Stacked layers
 - [ ] Nested banded omega with cross-frequency modulation vs flat heterogeneity, matched
-      parameters, on a long-sequence task
-- [ ] Spiking readout: does phase coding degrade more gracefully than a continuous readout
-      under quantisation of the hidden state?
+      parameters, on a long-sequence task (E07 in docs/, designed but not started)
+- [ ] Spiking readout: does phase coding degrade more gracefully than a continuous readout?
+      (E08 in docs/; E06 is the continuous baseline it must beat)
+
+## Next in line, explicitly
+
+1. **Readout precision on sMNIST.** Priority one: it is the task the analog paper used,
+   so its figure replaces the biphase one as the README headline once it exists.
+
+       python experiments/readout_precision.py --task smnist
+
+   Needs the MNIST download (blocked in some sandboxes; runs fine on a normal machine,
+   caches to `data/mnist.npz`). ~1 min train on GPU, a few min on CPU. Output lands in
+   `results/readout_precision_smnist.{json,png}`. Then: swap the figure into README and
+   docs/E06, note both tasks in the E06 table, and update the "one task, one seed" caveat.
+   Expected shape: same as biphase (float readout collapses, retrained ridge recovers,
+   sampled-only nearly harmless); if the collapse threshold differs by many bits, that
+   difference is itself worth a sentence (task coding fragility).
+
+2. **Biphase trained grid.** Opportunistic, GPU box, not blocking anything.
+
+       python experiments/run_diversity.py --quick    # ~2 min smoke test first
+       python experiments/run_diversity.py            # only if quick separates
+
+   Caution: at zeta=0.15 the resonances are broad (Q~3), so a homogeneous bank near the
+   geometric mean may also solve the task through the engaged tanh, and the grid would
+   come back mushy. Add a low-zeta condition (e.g. zeta=0.02) before trusting a null
+   result. If it is mushy anyway, write that into docs/E05 honestly; the at-init probe
+   already carries the sharp claim.
+
+3. **Application side** (not in this repo): rewrite the cover letter sentence that says
+   the falsifying experiment is "designed and waiting" to point at the E06 result
+   instead, once the sMNIST variant confirms; the literature PDFs listed in the
+   application folder's literature/README.md still need manual download.
+
+Do NOT start stacked layers, the nested architecture (E07), or a spiking implementation
+(E08) before the September deadline. A half-built experiment reads worse than a designed
+proposal.
 
 ## The open tension
 
@@ -134,3 +175,15 @@ precondition rather than a nice-to-have.
   dtype or scaling change.
 - Set `git config core.autocrlf input` (or use the `.gitattributes`) when moving between
   Windows and WSL, or every file shows as fully modified.
+- **Scale features BEFORE appending a bias column.** The ridge estimators in
+  `probe_mechanism.py` and `readout_precision.py` once scaled a column of ones by its own
+  (zero) spread, creating a 1e9 column that poisoned the normal equations and deflated
+  accuracies on perfectly separable features. Fixed in both; the E05 table was regenerated
+  (`results/probe_mechanism.txt` is the committed record). If a linear probe reports
+  chance on features a trained readout classifies, suspect the estimator before the data.
+- **Numbers quoted in docstrings drift.** The E05 table in `horn/tasks.py` disagreed with
+  the current code by exactly 2x in rms|x| (older task config). When a quoted table and a
+  script disagree, rerun the script; the committed txt/json in `results/` is the record.
+- **Prose style, kept deliberately:** no em-dashes anywhere (use commas, colons,
+  parentheses); no addressing the reader as "you" in docs; plain first person is fine.
+  The application documents' voice follows the same rules.

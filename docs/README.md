@@ -11,8 +11,9 @@ that keeps them interpretable after the run that made them has scrolled away.
 | E03 | [Sequential MNIST](E03_smnist.md) | Where does a single-layer HORN land on sMNIST? | done | row-wise **0.897**, pixel-wise **0.794** |
 | E04 | [Frozen vs learned ω, ζ](E04_frozen_vs_learned.md) | Do learned oscillator constants beat a fixed bank? | done | learned 0.897 vs frozen 0.872 (+0.026); ω migrates down 38% median |
 | E05 | [Biphase / phase readout](E05_biphase.md) | Is there a task where power pooling provably loses? | probe done, trained grid pending | at init: `W_rec=0` at chance everywhere; recurrence + amplitude reach 1.00 |
-| E06 | Nested bands vs flat heterogeneity | Does structured 1:6 banding + slow-phase gating beat a bag of frequencies? | planned | see `HORN_repo_plan.md`, conditions A–D |
-| E07 | Spiking readout under quantisation | Does phase coding degrade more gracefully than a continuous readout? | planned | pending |
+| E06 | [Readout precision](E06_readout_precision.md) | Does the analog paper's readout collapse reproduce in simulation? | done | info survives to **3 bits** in-loop (ridge 1.00); float readout collapses <14 bits; agreement bottoms at 0.26 ≈ the paper's 0.28 |
+| E07 | Nested bands vs flat heterogeneity | Does structured 1:6 banding + slow-phase gating beat a bag of frequencies? | planned | see `HORN_repo_plan.md`, conditions A–D |
+| E08 | Spiking readout under quantisation | Does phase coding degrade more gracefully than a continuous readout? | planned | E06 sets the baseline it must beat |
 
 ## Rules
 

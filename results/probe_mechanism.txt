@@ -1,0 +1,18 @@
+biphase task: 3 classes, chance 0.333, held-out sd 0.0192
+band 1.00-40.0 Hz, stimulus at 10 and 20 Hz
+
+w_scale  W_rec   rms|x|   nonlin |   mean    rms   last
+--------------------------------------------------------------
+    0.1   free    0.028  2.3e-03 |  0.323  0.365  0.320
+    0.1   zero    0.028  2.3e-03 |  0.323  0.365  0.320
+    1.0   free    0.279  1.4e-01 |  1.000  0.372  0.687
+    1.0   zero    0.279  1.4e-01 |  0.323  0.365  0.320
+    3.0   free    0.837  4.1e-01 |  1.000  0.418  1.000
+    3.0   zero    0.837  4.1e-01 |  0.323  0.365  0.320
+   10.0   free    2.789  6.8e-01 |  1.000  0.652  1.000
+   10.0   zero    2.790  6.8e-01 |  0.323  0.365  0.320
+
+chance is 0.333. W_rec=zero rows should sit there at EVERY
+amplitude - that is the filter-bank control. If they do not, the claim
+that a bank of independent resonators cannot represent a biphase is
+wrong, and the experiment needs rethinking before it is run.
