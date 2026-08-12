@@ -1,16 +1,5 @@
 """MNIST loading.
 
-No torchvision, no tensorflow-datasets. Those pull in a second deep-learning
-framework to download four files, and the point of this repo is that the only
-framework present is JAX.
-
-WHY THERE IS NO SYNTHETIC FALLBACK
-----------------------------------
-An earlier version of this loader fell back to random data when the download
-failed, printing a warning banner. That is a trap. Warnings scroll off, notebooks
-get re-read weeks later, and a plausible-looking accuracy number computed on noise
-is worse than a crash - it is a result you might report. If the data cannot be
-loaded, this raises.
 """
 
 from __future__ import annotations

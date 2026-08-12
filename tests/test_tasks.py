@@ -28,8 +28,8 @@ KW = dict(f_hz=10.0, n_steps=400, dt=2.5e-3, noise=0.0)
 def test_power_spectrum_is_matched_across_classes():
     """THE critical test. If class spectra differ, rms is not a control.
 
-    Compared as a fraction of the peak, because absolute FFT power depends on
-    length and amplitude and the quantity that matters is relative difference.
+    Compared as a fraction of the peak because absolute FFT power depends on
+    length and amplitude, and the quantity that matters is relative difference.
     """
     freqs, power = power_spectrum_by_class(jax.random.PRNGKey(0), 128, **KW)
 
@@ -92,7 +92,7 @@ def test_global_phase_is_random_so_absolute_phase_carries_nothing():
 
 
 def test_classes_are_actually_distinguishable():
-    """The waveforms must differ, or the task is unsolvable rather than hard.
+    """The waveforms must differ, or the task is unsolvable.
 
     Compared as the mean waveform after aligning on the fundamental's phase -
     which is exactly the information a phase-sensitive mechanism could use.

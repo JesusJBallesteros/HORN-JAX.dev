@@ -122,9 +122,9 @@ def step(params, state, u, dt=0.1):
         state:  HORNState, current (x, v).
         u:      external input this step, shape (in_size,) or (batch, in_size).
         dt:     integration timestep. Smaller = more accurate but more compute.
-                Rule of thumb: dt must be well below the period of your FASTEST
+                Rule of thumb: dt must be well below the period of the FASTEST
                 oscillator, i.e. dt << 2*pi/omega_max. If dt is too large the
-                integration goes unstable and you get NaNs regardless of the learning rate.
+                integration goes unstable and produces NaNs regardless of the learning rate.
 
     Returns:
         (new_state, x) - the new state, and the position as this step's output.

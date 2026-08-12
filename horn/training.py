@@ -1,16 +1,13 @@
-"""Training loop, lifted out of notebook 02 so experiments and tests can reuse it.
+"""Training loop, from notebook 02 so experiments and tests can reuse it.
 
-Nothing here is HORN-specific beyond the signature of `loss_and_acc`. It exists
-because a training loop that lives only inside a notebook cell cannot be called
-from a sweep, cannot be tested, and gets silently re-typed with small differences
-every time it is needed.
+Nothing here is HORN-specific beyond the signature of `loss_and_acc`. A training
+loop inside a notebook cell cannot be called from a sweep, cannot be tested.
 
-`freeze_rec` is the addition that notebook 02 did not have. Zeroing the gradient
-on W_rec holds the population at its initialisation - all-to-all coupling still
-present but never adapted. Setting W_rec to zero outright at init AND freezing it
-gives a bank of genuinely independent resonators, which is the control the
-biphase task needs: a filter bank cannot form products between units, so it
-cannot represent a biphase at all.
+`freeze_rec` is an addition. Zeroing the gradient on W_rec holds the population 
+at its initialisation, all-to-all coupling still present but never adapted. 
+Setting W_rec to zero outright at init AND freezing it gives a bank of independent 
+resonators, which is the control the biphase task needs, as a filter bank cannot 
+form products between units, so it cannot represent a biphase at all.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """Correctness tests for the HORN core.
 
-These do not check the code itself. They check the physics of the model, which is what matters.
-The HORN is a recurrent neural network, but it is also a physical system: a population of coupled
+These do not check the code itself. They check the physics.
+The HORN is a recurrent neural network and a physical system: a population of coupled
 damped harmonic oscillators. The physics is what makes the model useful.
 An uncoupled, unforced HORN unit is just a damped harmonic oscillator, and that has a known
 closed-form solution, so we can compare against ground truth.
@@ -36,18 +36,17 @@ def _isolated(n_osc, omega, zeta):
 
 
 def test_matches_analytic_underdamped():
-    """TEST 1 - the trajectory must match the closed-form solution.
+    """TEST 1. the trajectory must match the closed-form solution.
 
     Release the oscillator from x=1 with zero velocity and no drive, then compare
     against the exact solution of x'' + 2*zeta*omega*x' + omega^2*x = 0.
     """
-    omega, zeta, dt, T = 2.0, 0.05, 1e-4, 20000  # small dt: we are testing the model,
-                                                 # not tolerating integration error
+    omega, zeta, dt, T = 2.0, 0.05, 1e-4, 20000  # small dt for testing
     p = _isolated(1, omega, zeta)                          # one isolated oscillator
     s0 = HORNState(x=jnp.ones((1,)), v=jnp.zeros((1,)))    # released from rest at x=1
     _, xs = run_sequence(p, s0, jnp.zeros((T, 1)), dt)     # zero input for T steps
 
-    # --- the exact solution, for comparison ---
+    # the exact solution, for comparison
     t = np.arange(1, T + 1) * dt              # time of each recorded sample.
                                               # Starts at 1, not 0: run_sequence returns
                                               # the state AFTER each step, so the first
@@ -66,9 +65,9 @@ def test_matches_analytic_underdamped():
 
 
 def test_energy_conserved_when_undamped():
-    """TEST 2 - the integrator must not manufacture energy.
+    """TEST 2. the integrator must not inject energy.
 
-    This is the test that distinguishes semi-implicit from explicit Euler.
+    This tests semi-implicit vs explicit Euler.
     With zeta -> 0 and no drive there is nothing to add or remove energy, so
     E = 0.5*(v^2 + omega^2*x^2) must stay flat forever. Explicit Euler fails
     this: it pumps energy in every step and the amplitude grows without bound.
@@ -90,7 +89,7 @@ def test_energy_conserved_when_undamped():
 
 
 def test_overdamped_decays_without_oscillating():
-    """TEST 3 - the damping regimes must behave qualitatively correctly.
+    """TEST 3. the damping regimes must behave qualitatively correctly.
 
     zeta > 1 is overdamped: the system is too sluggish to overshoot, so it must
     crawl back to zero without ever crossing it. If the sign of the damping term
@@ -105,14 +104,13 @@ def test_overdamped_decays_without_oscillating():
 
 
 def test_heterogeneous_frequencies_are_independent():
-    """TEST 4 - each oscillator must keep its own frequency.
+    """TEST 4. each oscillator must keep its own frequency.
 
-    This is the property the whole nested-frequency research idea depends on:
+    This is the property the nested-frequency research idea depends on:
     a population with different omega must behave as a bank of independent
-    filters, not smear into one shared frequency. Verified in the frequency
-    domain rather than by eye.
+    filters, not smear into one shared frequency.
     """
-    omegas = jnp.array([1.0, 4.0])          # deliberately a 1:4 ratio, as in theta:gamma
+    omegas = jnp.array([8.0, 32.0])          # deliberately a 1:4 ratio, as in theta:gamma
     p = HORNParams(
         W_in=jnp.zeros((2, 1)),
         W_rec=jnp.zeros((2, 2)),            # uncoupled, so they CANNOT entrain each other
@@ -135,15 +133,15 @@ def test_heterogeneous_frequencies_are_independent():
     # 2*pi/(T*dt) rad/s, so asserting tighter than that would be testing the
     # resolution of the frequency grid rather than the correctness of the dynamics.
     tol = 2 * np.pi / (T * dt)
-    assert abs(peak[0] - 1.0) < tol, (peak, tol)
-    assert abs(peak[1] - 4.0) < tol, (peak, tol)
+    assert abs(peak[0] - float(omegas[0])) < tol, (peak, tol)
+    assert abs(peak[1] - float(omegas[1])) < tol, (peak, tol)
 
 
 def test_gradients_flow():
-    """TEST 5 - the model must be differentiable end to end.
+    """TEST 5. the model must be differentiable end to end.
 
     A model can be numerically perfect and still untrainable if gradients vanish,
-    explode, or hit a NaN somewhere in the scan. This checks that reverse-mode
+    explode, or hit a NaN. This checks that reverse-mode
     autodiff makes it through the whole recurrence intact.
     """
     key = jax.random.PRNGKey(0)                                    # fixed seed: reproducible

@@ -6,7 +6,7 @@ with the code rather than living in a chat session on one machine.
 ## What this is
 
 A from-scratch JAX implementation of Harmonic Oscillator Recurrent Networks (HORN), built
-as a code sample for an application to Natural Intelligence GmbH (NISYS, Frankfurt —
+as a code sample for an application to Natural Intelligence GmbH (NISYS, Frankfurt:
 Felix Effenberger and Wolf Singer), whose architecture is based on HORN. The application
 call closes early September 2026.
 
@@ -34,7 +34,7 @@ oscillator recurrent network*, arXiv:2509.04064. Reference implementation: `brai
    8-150 Hz) but only partially.
 2. **Memory horizon is `1/(zeta*omega)`, not `1/zeta`.** Measured in *cycles* it is
    `1/(2*pi*zeta)` and depends on zeta alone. So zeta sets memory in cycles, omega sets it
-   in seconds — and zeta is simultaneously the amplitude-normalisation knob, which is a
+   in seconds, and zeta is simultaneously the amplitude-normalisation knob, which is a
    conflict.
 3. **`dt` is bounded by the fastest unit.** A learned omega drifting upward can destabilise
    the solver with no parameter looking obviously wrong.
@@ -61,18 +61,18 @@ Both were predicted by finding #1 above, and both look like a learning-rate prob
 ```
 horn/core.py            dynamics: init_params, step, run_sequence, energy
 horn/model.py           sequence model: init_net, forward, loss_and_acc, usable_band
+horn/tasks.py           freq_batch (plumbing check), biphase_batch (the phase question)
+horn/training.py        train / evaluate, freeze_osc and freeze_rec controls
 horn/data.py            MNIST: IDX parsing, npz cache. Raises rather than faking data.
 horn/paths.py           REPO / DATA_DIR / RESULTS_DIR, anchored to the package
-<<<<<<< HEAD
-tests/                  21 tests. test_dynamics = physics; test_model = plumbing;
-=======
-tests/                  23 tests. test_dynamics = physics; test_model = plumbing;
->>>>>>> e3b3bd2 (Fixed staled data error and documented)
-                        test_data = loader; test_paths = path anchoring. See TESTING.md.
+experiments/            probe_mechanism (separability at init), run_diversity (the grid)
+tests/                  20 tests. test_dynamics = physics; test_model = plumbing;
+                        test_tasks = task construction. See TESTING.md.
+docs/                   experiment log, one page per experiment: E01-E05 + index
 notebooks/01_test_core  validation against closed-form solutions
 notebooks/02_sequence_training  readout, training loop, sMNIST
 results/                curated figures and run records, committed on purpose
-HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
+HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal (gitignored)
 ```
 
 ## State
@@ -81,8 +81,12 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
       amplitude and phase, dt convergence)
 - [x] Sequence layer + linear readout + training loop
 - [x] Frequency discrimination trained to ceiling
-- [ ] **Sequential MNIST — next. Needs a GPU box; download caches to `data/mnist.npz`.**
-- [ ] Frozen vs learned (omega, zeta) — wired up, needs real data to say anything
+- [x] Sequential MNIST: row-wise 0.897 (96 osc), pixel-wise 0.794 (128 osc). See docs/E03.
+- [x] Frozen vs learned (omega, zeta): 0.872 vs 0.897; omega migrates down 38% median,
+      zeta collapses 0.15 -> 0.007-0.061. See docs/E04.
+- [x] Biphase task built + probed at init: W_rec=0 at chance everywhere, recurrence +
+      engaged tanh -> 1.00. See docs/E05 and horn/tasks.py.
+- [ ] **Biphase trained grid, next. `python experiments/run_diversity.py` on a GPU box.**
 - [ ] Stacked layers
 - [ ] Nested banded omega with cross-frequency modulation vs flat heterogeneity, matched
       parameters, on a long-sequence task
@@ -91,39 +95,42 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
 
 ## The open tension
 
-Frequency discrimination trains to 1.00 with `pool="rms"`, which discards phase entirely. So
-the project's headline claim — that oscillators carry information in amplitude *and phase*, a
-strictly richer state space at equal unit count — is **not exercised by any task in the repo**.
-The `rms`-vs-`mean` ablation is already built and is the right instrument; what is missing is a
-task on which `rms` *loses*. Until then, everything demonstrated here is reachable with a bank
-of bandpass filters and a power readout.
+Everything *trained* so far is reachable with a bank of bandpass filters and a power readout,
+so the headline claim that oscillators carry information in amplitude *and phase* needed a task
+where power provably fails. That task now exists: the biphase (horn/tasks.py, docs/E05), whose
+class-conditional power spectra are matched by construction. The at-init probe already delivered
+the sharp result, with a correction to the prediction: the falsifying control is the
+architecture (`W_rec = 0` at chance at every amplitude), not the pooling. An engaged tanh
+converts biphase into internal power and rms climbs to 0.65.
 
-Designing that task is the next scientific step after sMNIST.
+What remains is the trained heterogeneous-vs-homogeneous grid (`run_diversity.py`), which asks
+whether frequency diversity wins at matched parameter count on a task where it is a
+precondition rather than a nice-to-have.
 
 ## Gotchas
 
 - MNIST download can fail behind restrictive networks. The loader now **raises** rather than
-  substituting synthetic data — a warning banner scrolls off, and a plausible accuracy number
+  substituting synthetic data: a warning banner scrolls off, and a plausible accuracy number
   computed on noise is worse than a crash. If offline, drop `mnist.npz` into `data/`.
 - **`ModuleNotFoundError: No module named 'horn'`** used to happen because VS Code's
   `jupyter.notebookFileRoot` defaults to the *workspace* folder, so with the workspace opened
   one level above the repo the package sat below cwd and no `sys.path` walk could find it.
   **Fixed properly:** the project is now installable. `pip install -e ".[dev,notebooks]"` from
   the repo root, and `import horn` resolves everywhere with no path manipulation. If it recurs,
-  the kernel is on the wrong interpreter — check it points at `.venv/bin/python`.
+  the kernel is on the wrong interpreter; check it points at `.venv/bin/python`.
 - After adding a NEW module to `horn/`, no reinstall is needed (editable installs track the
   source tree). After changing `pyproject.toml` dependencies, reinstall.
 - Notebook setup cells print the resolved `REPO`; glance at it the first time on any machine.
 - **Never write output to a relative path.** Editable install means scripts run from anywhere,
   so `plt.savefig("x.png")` lands in whatever directory the shell was in. Use
   `from horn.paths import results` and `plt.savefig(results("x.png"))`. Same for the MNIST
-  cache — `load_mnist()` with no argument defaults to `<repo>/data`, so it is downloaded once
+  cache: `load_mnist()` with no argument defaults to `<repo>/data`, so it is downloaded once
   rather than once per directory you happen to launch from.
 - The frequency-discrimination task at a 1-2000 Hz band over 1 s implies L = 20,000 steps,
   which is 25x longer than pixel-wise MNIST. Watch BPTT memory; raise `dt` if it bites.
 - **The MNIST cache is version-stamped** (`CACHE_VERSION` in `data.py`). A `.npz` written by an
-  older loader is detected and rebuilt rather than half-read — the first version of this failed
-  with `KeyError: 'xtr'` from the middle of `load_mnist`. Bump the version whenever key names,
+  older loader is detected and rebuilt rather than half-read (the first version of this failed
+  with `KeyError: 'xtr'` from the middle of `load_mnist`). Bump the version whenever key names,
   dtype or scaling change.
 - Set `git config core.autocrlf input` (or use the `.gitattributes`) when moving between
   Windows and WSL, or every file shows as fully modified.

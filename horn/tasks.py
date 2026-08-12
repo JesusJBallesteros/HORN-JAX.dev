@@ -1,31 +1,25 @@
-"""Synthetic tasks, and the frequency banks used to attack them.
+"""Synthetic tasks.
 
-Two tasks live here.
-
+Two tasks:
 `freq_batch`    classify which of several frequencies a noisy sinusoid carries.
-                Solved perfectly by power pooling. It is a plumbing check, not
-                evidence for anything: a magnitude FFT plus logistic regression
-                does the same job.
+                Solved perfectly by power pooling. It is a plumbing check, a 
+                magnitude FFT plus logistic regression does the same.
 
-`biphase_batch` the one that is actually a question. See below.
+`biphase_batch` the actual question.
 
 THE BIPHASE TASK
-----------------
 Every stimulus is the same two tones, at f and 2f, at the same amplitudes:
 
     s(t) = sin(2*pi*f*t + p) + sin(2*pi*2f*t + 2p + psi)
 
 `p` is a global phase drawn uniformly per example. The class is `psi`, the
 BIPHASE: the phase of the second harmonic relative to twice the phase of the
-first. This is the quantity a bispectrum measures, and it is what the
-cross-frequency-coupling literature calls quadratic phase coupling.
+first. This is the quantity a bispectrum measures, the cross-frequency-coupling 
+or quadratic phase coupling.
 
-Three properties make it the right instrument for this repo:
-
+Three properties:
 1. **The power spectrum is identical across classes.** Both tones have fixed
-   amplitude; only their relative phase changes. So any readout that sees only
-   power is at chance BY CONSTRUCTION, not as an empirical finding. `pool="rms"`
-   is therefore a falsification test rather than a baseline.
+   amplitude; only their relative phase changes. `pool="rms"` is a test.
 
 2. **`psi` survives a global time shift.** Shifting t -> t + tau sends
    p -> p + 2*pi*f*tau and the second tone's phase to 2*(p + 2*pi*f*tau) + psi.
@@ -33,18 +27,18 @@ Three properties make it the right instrument for this repo:
    cannot be read off any absolute time reference. A readout of the final state
    alone is therefore also at chance, since the global phase is random.
 
-3. **Extracting `psi` requires a nonlinearity, and a specific one.** psi appears
-   in the signal only in cross-terms between the two tones. Expanding a cubic
-   nonlinearity in a sum of tones at f and 2f, the term in
-   cos^2(2*pi*f*t + p) * cos(2*pi*2f*t + 2p + psi) contains a component at zero
-   frequency proportional to cos(psi). A DC offset that depends on the biphase.
+3. **Extracting `psi` requires specific nonlinearity.** psi appears in the signal
+   only in cross-terms between the two tones. Expanding a cubic nonlinearity in 
+   a sum of tones at f and 2f, the term in 
+   cos^2(2*pi*f*t + p) * cos(2*pi*2f*t + 2p + psi) 
+   contains a component at zero frequency proportional to cos(psi). 
+   A DC offset that depends on the biphase.
 
-   So the prediction is sharp and falsifiable: a bank of INDEPENDENT resonators
-   feeding a linear readout cannot do this at all, whatever the pooling, because
-   no linear function of per-unit features contains a product of two units.
+ Prediction: a bank of INDEPENDENT resonators feeding a linear readout cannot do
+ this at all, whatever the pooling, because no linear function of per-unit 
+ features contains a product of two units.
 
-MEASURED AT INITIALISATION, BEFORE ANY TRAINING
------------------------------------------------
+MEASURED AT INITIALISATION, BEFORE TRAINING
 Held-out accuracy of a ridge readout on the pooled features of an UNTRAINED
 network, 3 classes, chance 0.333 (see `experiments/probe_mechanism.py`):
 
@@ -57,20 +51,20 @@ network, 3 classes, chance 0.333 (see `experiments/probe_mechanism.py`):
 
 Two conditions are required, and neither alone suffices:
 
-  * **recurrence** - with W_rec = 0 the network is at chance at EVERY amplitude,
+  * **recurrence.** With W_rec = 0 the network is at chance at EVERY amplitude,
     which is the prediction above confirmed;
-  * **amplitude** - with states of order 0.01 the tanh is linear to a part in
+  * **amplitude.** With states of order 0.01 the tanh is linear to a part in
     400, and a linear recurrent network is still just a filter bank.
 
 The control that falsifies is therefore the ARCHITECTURE (W_rec = 0), not the
 pooling. `rms` is only chance-level while the system is linear; once the
 nonlinearity is engaged it converts biphase into power too, which is why rms
-climbs to 0.648 at large amplitude. That is a real effect, not a leak - the
-stimulus power spectrum is still matched, but the network's internal spectrum is
-not.
+climbs to 0.648 at large amplitude. That is a real effect.
 
-This also means the frequency-diversity question and the phase question are one
-experiment: forming a product needs units at BOTH f and 2f, so heterogeneity is
+The stimulus power spectrum is still matched, but the network's internal spectrum 
+is not.
+
+Forming a product needs units at BOTH f and 2f, so heterogeneity is
 a precondition rather than an advantage.
 """
 
@@ -108,7 +102,7 @@ def homogeneous_bands(n_osc: int, f_lo: float, f_hi: float) -> jnp.ndarray:
     only thing that differs is the spread, which is the variable under test.
 
     Geometric rather than arithmetic mean because frequency is perceived and
-    behaves multiplicatively - the midpoint of 1 and 100 Hz is 10, not 50.5.
+    behaves multiplicatively: the midpoint of 1-100 Hz is 10, not 50.
     """
     return jnp.full((n_osc,), float(np.sqrt(f_lo * f_hi)), dtype=jnp.float32)
 
@@ -132,13 +126,12 @@ def biphase_batch(key, n, f_hz=10.0, n_steps=400, dt=2.5e-3,
                   biphases=DEFAULT_BIPHASES, noise=0.1, amps=(1.0, 1.0)):
     """Two tones at f and 2f; the class is their biphase. -> (L, n, 1), (n,).
 
-    Amplitudes are FIXED, not drawn - that is what keeps the power spectrum
-    identical across classes and makes the rms result a proof rather than an
-    observation. Do not randomise them without re-running
-    `tests/test_tasks.py::test_power_spectrum_is_matched_across_classes`.
+    Amplitudes are FIXED, not drawn, keeping the power spectrum identical across 
+    classes and making the rms result a proof. Do not randomise them without
+    re-running `tests/test_tasks.py::test_power_spectrum_is_matched_across_classes`.
 
     Noise is additive white, so it raises the floor equally for every class and
-    cannot leak label information either.
+    cannot leak label information.
     """
     k_y, k_p, k_n = jax.random.split(key, 3)
     psi_values = jnp.asarray(biphases, jnp.float32)
@@ -187,11 +180,9 @@ def power_spectrum_by_class(key, n_per_class=256, **kw):
 #   phi1 = p - pi/2                      phi2 = 2p + psi - pi/2
 #   phi2 - 2*phi1 = psi + pi/2
 #
-# Subtracting it is the difference between recovering the biphase you generated
-# and recovering one rotated by a quarter turn. A constant phase offset from a
-# convention mismatch is one of the documented ways the cross-frequency-coupling
-# literature produces spurious results, so it is worth being explicit rather than
-# tuning a threshold until a test passes.
+# A constant phase offset from a convention mismatch is one of the ways the 
+# cross-frequency-coupling literature produces spurious results, so it is worth 
+# being explicit rather than tuning a threshold until a test passes.
 _SIN_TO_COS_BIPHASE_OFFSET = np.pi / 2
 
 

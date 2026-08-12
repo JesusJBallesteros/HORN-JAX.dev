@@ -1,7 +1,0 @@
-# Dependencies live in pyproject.toml. This file exists so that the old
-# `pip install -r requirements.txt` habit still does the right thing.
-#
-#   CPU:   pip install -e ".[dev,notebooks]"
-#   CUDA:  pip install -e ".[cuda,dev,notebooks]"     # WSL2 + NVIDIA, see SETUP.md
-
--e .[dev,notebooks]

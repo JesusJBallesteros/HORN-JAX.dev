@@ -14,7 +14,7 @@ dist/
 HORN_repo_plan.md
 
 # Outputs
-# Figures are ignored by default so stray plots do not accumulate, but anything
+# Figures are ignored by default, but anything
 # deliberately placed in results/ or docs/ is kept.
 *.png
 !docs/*.png

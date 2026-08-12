@@ -1,13 +1,12 @@
 """Sequence model built on the HORN core: oscillator layer + linear readout.
 
-core.py gives you dynamics. To *learn* it needs
+core.py gives the dynamics. To *learn*, the model needs
   (a) pooling: a way to turn a whole trajectory into a fixed-size vector
   (b) linear readout: a map from that vector to class scores
   (c) a loss, and gradients that survive the recurrence
 
 UNITS
------
-Frequencies are specified in Hz, as in notebook 01, and converted to rad/s behind.
+Frequencies are specified in Hz and converted to rad/s behind.
 A sequence of L steps is treated as occupying a real duration
 T_seq seconds, so dt = T_seq / L. That keeps omega interpretable in Hz and makes
 band-structured initialisation (theta / gamma / ...) mean something.
@@ -141,7 +140,7 @@ def _pool(xs, vs, mode):
         return jnp.concatenate([jnp.sqrt((xs ** 2).mean(0) + 1e-12),
                                 jnp.sqrt((vs ** 2).mean(0) + 1e-12)], axis=-1)
     if mode == "meanrms":
-        # Both. Safe default when you do not know whether the class signal lives
+        # Both. Safe default when it is unclear whether the class signal lives
         # in the DC component or in the response power. Costs 2x readout width.
         return jnp.concatenate([xs.mean(0), vs.mean(0),
                                 jnp.sqrt((xs ** 2).mean(0) + 1e-12),

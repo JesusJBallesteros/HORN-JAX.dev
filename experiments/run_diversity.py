@@ -1,40 +1,36 @@
-"""Week 3: does frequency diversity buy anything, and can a HORN read a biphase?
+"""Frequency heterogeneity, can a HORN read a biphase?
 
     python experiments/run_diversity.py --quick        # ~2 min, smoke test
     python experiments/run_diversity.py                # the real grid
     python experiments/run_diversity.py --task freq    # the phase-free control task
 
-THE TWO QUESTIONS, ASKED AS ONE EXPERIMENT
-------------------------------------------
 1. Does a population with heterogeneous omega beat a homogeneous one at MATCHED
    parameter count?
 2. Is there a task where power pooling provably loses, so that phase is doing
    work rather than being asserted to?
 
-They are the same experiment because of how the biphase task is built (see
-horn/tasks.py). The label is the phase of the second harmonic relative to twice
-the phase of the first. Recovering it requires a product of a unit tuned near f
-with one tuned near 2f, which needs BOTH a nonlinearity to form the product and
-units at BOTH frequencies to form it from. So heterogeneity is not a nice-to-have
-here; it is a precondition.
+The label is the phase of the second harmonic relative to twice the phase of the first. 
+Recovering it requires a product of a unit tuned near f
+with one tuned near 2f, which needs BOTH:
+a nonlinearity to form the product
+ and
+units at BOTH frequencies to form it from.
 
-PREDICTIONS, AND HOW THEY WERE CORRECTED
-----------------------------------------
+So heterogeneity is a precondition.
+
+PREDICTIONS
 `experiments/probe_mechanism.py` measures separability at INITIALISATION, before
-any training. It found that two of three original predictions were wrong, and
-they were wrong in an informative way:
+any training. Two of three original predictions were wrong:
 
-  * `W_rec = 0` is at chance at every amplitude. CONFIRMED - a bank of
-    independent resonators cannot represent a biphase, which is the claim the
-    whole experiment rests on.
+  * `W_rec = 0` is at chance at every amplitude. A bank of
+    independent resonators cannot represent a biphase.
   * `rms` is at chance only while the system is LINEAR. Once the nonlinearity is
-    engaged it converts biphase into power and rms climbs to 0.65. So rms is not
-    the control; the architecture is.
-  * `last` is NOT at chance once recurrence is engaged - it reaches 1.000. The
+    engaged it converts biphase into power and rms climbs to 0.65.
+  * `last` is NOT at chance once recurrence is engaged, it reaches 1.00. The
     random global phase does not protect it, because the population encodes the
     biphase in a way a linear readout can reach.
 
-So the falsifying control is W_rec = 0, and the experiment is:
+So the H1 being W_rec = 0, and the experiment:
 
     W_rec = 0, any pooling, any amplitude   -> chance      (filter bank)
     W_rec free, states of order 0.1+        -> above chance
@@ -45,10 +41,8 @@ and tanh is linear to a part in 400; nothing works and the result would be a gri
 of chance values that says nothing about diversity. Default raised accordingly.
 
 MATCHING
---------
 Homogeneous and heterogeneous differ only in the spread of omega: same n_osc, so
-identical parameter count, and the same geometric-mean frequency. Checked by
-tests/test_tasks.py::test_matched_parameter_count_between_conditions.
+identical parameter count, and the same geometric-mean frequency.
 """
 
 from __future__ import annotations
@@ -220,7 +214,7 @@ def plot(records, n_classes, path, title):
     ax.axhline(1.0 / n_classes, color="k", ls=":", lw=1.2,
                label=f"chance = {1/n_classes:.2f}")
     ax.set(xticks=np.arange(len(pools)), ylabel="test accuracy",
-           title=f"Frequency diversity and phase readout — {title}", ylim=(0, 1.02))
+           title=f"Frequency diversity and phase readout: {title}", ylim=(0, 1.02))
     ax.set_xticklabels(pools)
     ax.legend(fontsize=8, frameon=False, ncol=2)
     ax.grid(axis="y", alpha=0.25)
