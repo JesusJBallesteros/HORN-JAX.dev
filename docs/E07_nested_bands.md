@@ -1,8 +1,5 @@
 # E07: Nested bands versus flat heterogeneity
 
-Designed, not started. Written down because the design is the part worth having on
-record; a half-built version would say less.
-
 **Question.** Published HORNs draw natural frequencies from a spread, which is
 heterogeneity without structure. Cortex does something narrower: frequencies stand in
 roughly fixed ratios, and the phase of the slow rhythm modulates the amplitude of the
