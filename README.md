@@ -15,6 +15,8 @@ with a two-dimensional state, position x and velocity ẋ, evolving according to
 
 ```math
 x'' + 2ζω x' + ω² x = f(x, u)
+```
+```math
 f(x, u) = W_rec · tanh(x) + W_in · u
 ```
 
