@@ -210,12 +210,16 @@ MNIST downloads on first use and caches to `data/mnist.npz`.
 - [x] Frozen vs learned (ω, ζ)
 - [x] Readout precision: the analog paper's readout collapse, reproduced and dissected on
       biphase and on sMNIST, the paper's own task
-- [ ] Biphase: properly sized trained grid (the smoke-scale run is recorded but
-      inconclusive; see E05)
+- [ ] Biphase: properly sized trained grid (the pilot run is recorded but inconclusive;
+      see [E05](docs/E05_biphase.md))
 - [ ] Stacked layers
-- [ ] Nested banded ω with cross-frequency modulation vs flat heterogeneity, matched parameters
-- [ ] Spiking readout: does phase coding degrade more gracefully than a continuous readout?
-      E06 is the baseline to beat
+- [ ] Nested banded ω with cross-frequency modulation vs flat heterogeneity, at matched
+      parameter count. Designed, not started: [E07](docs/E07_nested_bands.md)
+- [ ] Spiking readout under precision loss. Designed, not started:
+      [E08](docs/E08_spiking_readout.md), with E06 as the baseline it has to beat
+
+The last two are written up as designs rather than left as one-line intentions, and
+deliberately not half-built. Each states its predictions and what would falsify it.
 
 ## References
 
@@ -225,3 +229,9 @@ MNIST downloads on first use and caches to `data/mnist.npz`.
   neocortical circuits: A computational perspective*, PNAS 2025
   ([link](https://www.pnas.org/doi/10.1073/pnas.2412830122))
 - Reference implementation: [`brainmass`](https://brainmass.readthedocs.io/reference/horn.html)
+
+The wider reading these experiments are built against, annotated with what each paper
+contributes here, is in [`docs/reading.md`](docs/reading.md): coRNN and LinOSS on
+oscillators as sequence models, Lisman & Jensen on the theta-gamma code, Izhikevich,
+Higuchi et al. and Frady & Sommer on spike-timing readouts, and Rhythm-SNN as the nearest
+existing work to E07 and E08.

@@ -78,11 +78,13 @@ experiments/            probe_mechanism (separability at init), run_diversity (t
                         readout_precision (in-loop vs sampled quantisation, E06)
 tests/                  32 tests. test_dynamics = physics; test_model = plumbing;
                         test_tasks = task construction. See TESTING.md.
-docs/                   experiment log: E00 (methodology) + E01-E06, one page each + index
+docs/                   experiment log: E00 (methodology), E01-E06 (run), E07-E08
+                        (designed, not started), reading.md (annotated bibliography)
 notebooks/01_test_core  validation against closed-form solutions
 notebooks/02_sequence_training  readout, training loop, sMNIST
 results/                curated figures and run records, committed on purpose
-HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal (gitignored)
+HORN_repo_plan.md       private planning notes (gitignored). The parts worth keeping are
+                        now in docs/E07, docs/E08 and docs/reading.md
 ```
 
 ## State
@@ -140,9 +142,10 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
    real scale, that IS reportable, as a constraint on the diversity claim at this network
    size, and docs/E05 already has the slot for it.
 
-Stacked layers, the nested architecture (E07) and a spiking readout (E08) stay unstarted
-deliberately: each is specified in docs/, and the designs say more than half-built
-versions would. They start after the grid above is settled, not before.
+Stacked layers, the nested architecture and a spiking readout stay unstarted
+deliberately. E07 and E08 are now written up as full designs in docs/, each with its
+predictions and its falsifying outcome recorded before any run, which says more than a
+half-built version would. They start after the grid above is settled, not before.
 
 ## The open tension
 
