@@ -1,0 +1,10 @@
+# Normalise line endings so Windows/WSL round-trips do not show every file as
+# modified. Text files are committed with LF.
+* text=auto
+*.py text
+*.md text
+*.toml text
+*.txt text
+*.ipynb text
+*.png binary
+*.json text

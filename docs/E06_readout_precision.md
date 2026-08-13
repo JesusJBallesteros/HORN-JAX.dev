@@ -1,26 +1,28 @@
-# E06: Readout precision, the analog paper's failure mode in simulation
+# E06: Readout precision, the analog failure mode in simulation
 
-**Question.** arXiv:2509.04064 transferred a trained HORN to analog hardware: the dynamics
-matched their digital twin, yet the digital readout agreed with it on only 28.4% of
-predictions, and retraining a linear readout on the analog dynamics recovered full
-performance. Can that failure mode be reproduced and dissected in simulation, with
-precision as the controlled variable?
+**Question.** Carvalho et al. (arXiv:2509.04064) transferred a fitted HORN onto analog
+hardware. The dynamics matched their digital twin, but the digital readout agreed with it
+on only 28.4% of trials, and refitting a linear readout on the analog activity restored
+performance. Can that be reproduced in simulation with precision as the manipulated
+variable, and does the outcome depend on how the task encodes its label?
 
-**Method.** Train a HORN plus affine readout at float32 on the biphase task (the
-phase-coded task from E05, so the information at stake is the delicate kind). Then re-run
-inference under two precision regimes, sweeping bit depth:
+**Method.** Fit the network and its linear decoder at full precision, then re-run
+inference with the state rounded to n bits, sweeping n. Two regimes:
 
-- **in-loop**: the state (x, v) is quantised inside the recurrent loop at every step,
-  which is how an analog substrate actually evolves;
-- **sampled**: the float dynamics are quantised only at observation, an ADC at the output.
+- **in-loop**, the state (x, v) rounded at every timestep, as an analog substrate would
+  evolve it;
+- **observation only**, full-precision dynamics rounded at readout, the equivalent of a
+  coarse ADC on an otherwise clean recording.
 
-Per bit depth, report the float-trained readout's accuracy, the accuracy of a ridge
-readout retrained on the degraded features, and the fraction of predictions agreeing with
-the float model (the paper's metric).
+Reported per bit depth: accuracy of the decoder fitted at full precision, accuracy of a
+ridge decoder refitted on the degraded activity, and agreement with the full-precision
+model's trial-by-trial predictions, which is the metric the paper uses. Two tasks, chosen
+because they encode the label differently: the biphase (phase-coded by construction, E05)
+and row-wise sMNIST (the paper's task, amplitude-coded in practice).
 
-**Result.** Float32 test accuracy 1.000, chance 0.333.
+## Biphase (full precision 1.000, chance 0.333)
 
-| bits | in-loop, orig | in-loop, ridge | agreement | sampled, orig |
+| bits | in-loop, original | in-loop, refitted | agreement | observation only |
 |---|---|---|---|---|
 | 1 | 0.258 | 0.820 | 0.258 | 0.836 |
 | 3 | 0.258 | 1.000 | 0.258 | 0.842 |
@@ -30,45 +32,63 @@ the float model (the paper's metric).
 | 14 | 0.982 | 1.000 | 0.982 | 1.000 |
 | 16 | 1.000 | 1.000 | 1.000 | 1.000 |
 
-![readout precision](../results/readout_precision_biphase.png)
+![readout precision, biphase](../results/readout_precision_biphase.png)
 
-bits  in-loop:   orig  ridge  agree   sampled:   orig  ridge
-   1            0.117  0.142  0.128             0.260  0.826
-   2            0.191  0.450  0.200             0.295  0.848
-   3            0.308  0.696  0.303             0.546  0.876
-   4            0.362  0.772  0.358             0.796  0.884
-   5            0.682  0.846  0.716             0.854  0.888
-   6            0.845  0.872  0.929             0.857  0.878
-   8            0.863  0.856  0.989             0.861  0.880
-  10            0.861  0.876  0.994             0.862  0.878
-  12            0.861  0.882  0.997             0.861  0.880
-  14            0.860  0.882  0.997             0.861  0.880
-  16            0.861  0.884  0.998             0.861  0.880
+## Row-wise sMNIST (full precision 0.861, chance 0.100)
 
-![readout precision sMINST](results/readout_precision_smnist.png)
+| bits | in-loop, original | in-loop, refitted | agreement | obs. only | obs. refitted |
+|---|---|---|---|---|---|
+| 1 | 0.117 | 0.142 | 0.128 | 0.260 | 0.826 |
+| 2 | 0.191 | 0.450 | 0.200 | 0.295 | 0.848 |
+| 3 | 0.308 | 0.696 | 0.303 | 0.546 | 0.876 |
+| 4 | 0.362 | 0.772 | 0.358 | 0.796 | 0.884 |
+| 5 | 0.682 | 0.846 | 0.716 | 0.854 | 0.888 |
+| 6 | 0.845 | 0.872 | 0.929 | 0.857 | 0.878 |
+| 8 | 0.863 | 0.856 | 0.989 | 0.861 | 0.880 |
+| 16 | 0.861 | 0.884 | 0.998 | 0.861 | 0.880 |
 
-Three separate facts, one figure:
+![readout precision, sMNIST](../results/readout_precision_smnist.png)
 
-1. **The information survives to 3 bits.** A retrained linear readout classifies
-   perfectly on dynamics evolving at 3-bit state precision, and reaches 0.82 at 1 bit.
-2. **The float-trained readout collapses below 14 bits**, bottoming out near the paper's
-   28% agreement. The mapping is fragile, not the information, which is the paper's
-   hardware finding reproduced end to end.
-3. **The damage is done inside the loop, not at the output.** Quantising only the
-   observation barely hurts even at 1 bit, because pooling over 400 steps averages
-   observation noise away. Precision matters where the dynamics live.
+## Reading
 
-The gap between in-loop collapse (14 bits) and information survival (3 bits) is the
-opportunity the analog program exploits: a readout adapted to the substrate is worth
-roughly 11 bits of state precision on this task.
+**The published pattern reproduces on the published task.** On sMNIST the decoder fitted
+at full precision collapses under in-loop rounding while a refitted ridge decoder
+recovers most of the performance, 0.308 to 0.696 at 3 bits. Refitting the readout
+recovers what the substrate preserved. The paper's 28.4% was a single hardware operating
+point rather than a bit depth, so what is comparable is the shape of the failure, not the
+value; this curve happens to pass through that agreement level near 3 bits.
 
-**Caveat.** One task, one seed, one architecture size. The sMNIST variant
-(`--task smnist`) runs the same protocol on the task the paper used and has not been run
-yet; the biphase result is the committed one because it needs no data download.
+**The two tasks fail in opposite ways.** The expectation going in, and the premise of the
+planned spiking-readout work (E08), was that phase coding might degrade more gracefully.
+For the decoder mapping it does the reverse: sMNIST is back to full-precision accuracy by
+6 bits, the biphase needs 14. Lightly damped, strongly coupled dynamics are what the
+biphase requires, and per-step rounding acts on them as state noise, so trajectories
+decorrelate from the full-precision run and the specific decoder directions fitted at
+full precision stop pointing at the label. Class statistics survive, which is why the
+refitted decoder reaches 1.000 at 3 bits.
+
+**The information behaves the other way round.** On the biphase it survives intact to 3
+bits, refitted decoder 1.000. On sMNIST it erodes, refitted decoder 0.696 against 0.884
+at full precision, because fine amplitude gradations carry digit identity and rounding
+removes them. Phase coding protects the information and endangers the mapping; amplitude
+coding does the opposite. Any robustness claim for a spike-timing readout now has a
+measured baseline rather than an assumed one.
+
+**Rounding the observation is nearly harmless.** With a refitted decoder, 1-bit
+observation gives 0.826 on sMNIST and 0.836 on the biphase, because summarising over the
+sequence averages out observation noise much as trial averaging does in a recording. The
+loss of precision matters where the dynamics evolve, not where they are measured. That is
+an argument for designing the readout together with the substrate rather than for
+digitising more finely.
+
+**Caveats.** One seed per task and one population size each, so the contrast between
+tasks is a pattern to test rather than an established result. The sMNIST full-precision
+value here (0.861, 2000-trial evaluation) sits below E03's 0.897 because the evaluation
+set and run differ. Provenance headers in `results/readout_precision_*.txt`.
 
 **Reproduce.**
 
 ```bash
-python experiments/readout_precision.py            # biphase, CPU, ~3 min
-python experiments/readout_precision.py --task smnist
+python experiments/readout_precision.py                 # biphase, CPU, ~3 min
+python experiments/readout_precision.py --task smnist   # downloads MNIST once
 ```

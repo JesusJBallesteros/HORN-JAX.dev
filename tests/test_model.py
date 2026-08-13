@@ -108,7 +108,7 @@ def test_log_spaced_bands_endpoints():
 
 
 def test_drive_balance_and_recurrence_leverage():
-    """The bug this exists to prevent: an inert independent variable.
+    """This prevents an inert independent variable.
 
     `input_gain="normalised"` multiplies W_in by 2*zeta*omega^2. Nothing
     multiplied W_rec, so at 40 Hz the external drive outweighed the recurrent
@@ -118,7 +118,7 @@ def test_drive_balance_and_recurrence_leverage():
     returned bit-identical accuracies for conditions that were supposed to
     differ.
 
-    Nothing here asserts that "flat" is wrong - it is kept as the default so
+    Nothing here asserts that "flat" is wrong, it is kept as the default so
     earlier results reproduce. What is asserted is that the two settings are
     genuinely different, and that "normalised" gives recurrence enough leverage
     to be worth sweeping over.

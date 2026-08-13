@@ -8,8 +8,7 @@ From anywhere in the repo:
 pytest
 ```
 
-That is all. `testpaths` and `addopts` in `pyproject.toml` supply the rest, so there is no
-`-m pytest`, no path argument, no `cd` to the right directory. Output is `-v --durations=5` by
+That is all. `testpaths` and `addopts` in `pyproject.toml` supply the rest. Output is `-v --durations=5` by
 default: one line per test, plus the five slowest.
 
 Common variations:
@@ -17,8 +16,7 @@ Common variations:
 ```bash
 pytest tests/test_dynamics.py                       # one file
 pytest tests/test_model.py::test_forward_shapes     # one test
-pytest -k energy                                    # any test whose name matches
-pytest -k "gradient and not model"                  # boolean name filter
+pytest -k shapes                                    # any test whose name matches
 pytest -x                                           # stop at the first failure
 pytest --lf                                         # only the tests that failed last run
 pytest -q                                           # quiet, just the count
@@ -27,7 +25,7 @@ pytest -s                                           # let print() through (norma
 pytest | tee results/pytest.txt                     # keep a copy
 ```
 
-**Verbosity is a running total, not a switch.** Each `-v` is +1 and each `-q` is −1, and
+**Verbosity.** Each `-v` is +1 and each `-q` is −1, and
 `addopts` already contributes `-v`. So from this repo's baseline:
 
 | typed | net level | output |
@@ -37,23 +35,12 @@ pytest | tee results/pytest.txt                     # keep a copy
 | `pytest -qq` | −1 | just the final count |
 | `pytest -vv` | +2 | per test, plus extra detail on failures |
 
-This catches people out: `pytest -v` here nets to 0 and looks *less* verbose than the default.
-
-## Why `python tests/test_dynamics.py` does nothing
-
-A test file contains only `def test_*` functions and no top-level calls. Running it with
-`python` imports the module, defines the functions, and exits with code 0 and no output. Nothing
-is broken; there is simply no code at module level asking to be run.
-
-`pytest` is the thing that *finds* functions named `test_*` and calls them. `demo.py` behaves
-differently only because it has statements at module level that execute on import.
-
 ## What is tested, and why these things
 
-The suite is 20 tests in three files. The split is deliberate: physics in one place, plumbing in
-another, so a failure points immediately at which kind of problem it is.
+The suite is 32 tests in five files: physics in one place, plumbing in
+another, etc, so a failure points immediately at which kind of problem it is.
 
-### `tests/test_dynamics.py`: the physics (5)
+### `/test_dynamics.py`: the physics (5 tests)
 
 Checks the model against closed-form solutions rather than against itself. An uncoupled,
 unforced HORN unit is a textbook damped harmonic oscillator, so ground truth exists.
@@ -70,18 +57,35 @@ unforced HORN unit is a textbook damped harmonic oscillator, so ground truth exi
 If an oscillator implementation is wrong it is almost always the integrator, and the first two
 catch that.
 
-### `tests/test_model.py`: the plumbing (8)
+### `/test_model.py`: the plumbing (10)
 
 Shapes, batch independence, gradient reach into every parameter including `log_omega` and
-`log_zeta`, the freeze mechanism, and the `usable_band` arithmetic.
+`log_zeta`, the freeze mechanism, and the `usable_band` arithmetic. Two guards were added
+with the rec-gain fix: `test_drive_balance_and_recurrence_leverage` pins the external-to-
+recurrent drive ratio and the leverage of `W_rec` on the decoder's class scores, so the
+network cannot silently regress to feedforward (the E00 lesson), and
+`test_rec_gain_rejects_unknown_values` closes the config surface.
 
-### `tests/test_tasks.py`: task construction (7)
+### `/test_tasks.py`: task construction (7)
 
 Guards the properties the biphase experiment rests on, so a change to the task cannot silently
 invalidate the result: class power spectra are matched, the biphase survives a global time
 shift, the global phase carries nothing, classes are actually distinguishable, homogeneous and
 heterogeneous conditions have matched parameter counts, and additive noise cannot leak the
 label. Plus one check that `freq_batch` still works.
+
+### `/test_data.py`: the loader (6)
+
+Constructs IDX files from raw bytes so the parsing path is genuinely exercised (a header
+bug once shipped here). Cache validation gets three tests: stale layouts are rejected, a
+stale cache is deleted rather than half-read, and the cached path works offline with
+train-statistics standardisation.
+
+### `/test_paths.py`: path anchoring (4)
+
+Guards the rule that output goes to the repo, never the working directory. One test
+`chdir`s to a temporary directory, reloads `horn.paths`, and asserts nothing moved and
+nothing was written.
 
 ## Writing a new test
 
@@ -112,7 +116,7 @@ pytest --pdb            # drop into the debugger at the point of failure
 ```
 
 `--lf` ("last failed") reads `.pytest_cache/`, which is gitignored. After a green run it falls
-back to running everything, which is why it shows all 20 rather than nothing.
+back to running everything, which is why it shows all 32 rather than nothing.
 
 Tolerances in the physics tests are set to the accuracy the integrator can actually deliver, not
 to whatever made them pass. Semi-implicit Euler is first order, so error scales with `dt`. If a

@@ -25,7 +25,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 exec $SHELL          # reload so uv is on PATH
 ```
 
-`uv` handles Python versions and virtual environments, and is dramatically faster than conda or pip for this. If you would rather use conda, miniforge works fine — the rest of these instructions adapt directly.
+`uv` handles Python versions and virtual environments, and is dramatically faster than conda or pip for this. If you would rather use conda, miniforge works fine; the rest of these instructions adapt directly.
 
 ## 4. Create the project
 

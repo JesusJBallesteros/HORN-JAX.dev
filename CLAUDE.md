@@ -7,8 +7,7 @@ with the code rather than living in a chat session on one machine.
 
 A from-scratch JAX implementation of Harmonic Oscillator Recurrent Networks (HORN), built
 as a code sample for an application to Natural Intelligence GmbH (NISYS, Frankfurt:
-Felix Effenberger and Wolf Singer), whose architecture is based on HORN. The application
-call closes early September 2026.
+Felix Effenberger and Wolf Singer), whose architecture is based on HORN.
 
 Reference: Effenberger et al., *An analog-electronic implementation of a harmonic
 oscillator recurrent network*, arXiv:2509.04064. Reference implementation: `brainmass`.
@@ -56,7 +55,8 @@ oscillator recurrent network*, arXiv:2509.04064. Reference implementation: `brai
 Both were predicted by finding #1 above, and both look like a learning-rate problem:
 
 - **Input gain.** With a flat `W_in`, the population produces states of order 1e-6, the
-  softmax is uniform, loss sits at exactly `ln(n_classes)` and gradients are ~1e-4. Fix:
+  decoder's class probabilities are uniform, loss sits at exactly `ln(n_classes)`,
+  the value of pure guessing, and gradients are ~1e-4. Fix:
   scale each row of `W_in` by `2*zeta*omega^2` (`input_gain="normalised"`, the default).
 - **Pooling.** A sinusoidal response time-averages to ~zero, and the mean/rms ratio *falls*
   with frequency, so mean-pooling discards most from the units working hardest. On the
@@ -78,7 +78,7 @@ experiments/            probe_mechanism (separability at init), run_diversity (t
                         readout_precision (in-loop vs sampled quantisation, E06)
 tests/                  32 tests. test_dynamics = physics; test_model = plumbing;
                         test_tasks = task construction. See TESTING.md.
-docs/                   experiment log, one page per experiment: E01-E06 + index
+docs/                   experiment log: E00 (methodology) + E01-E06, one page each + index
 notebooks/01_test_core  validation against closed-form solutions
 notebooks/02_sequence_training  readout, training loop, sMNIST
 results/                curated figures and run records, committed on purpose
@@ -103,10 +103,11 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
 - [x] Readout precision on sMNIST: float32 0.861, agreement bottoms at 0.13 and passes
       through 0.30 at 3 bits against the analog paper's 0.284; retrained ridge lifts 3-bit
       accuracy 0.308 -> 0.696. Results in `results/readout_precision_smnist.{txt,json,png}`.
-      NOT yet written into docs/E06.
+      Written into docs/E06 beside the biphase run, stated as the E08-hypothesis inversion.
 - [x] **`rec_gain` fix.** `input_gain="normalised"` multiplied W_in by `2*zeta*omega^2` and
       nothing multiplied W_rec, so external drive outweighed recurrent drive ~5000:1 and the
-      network was effectively FEEDFORWARD. Zeroing W_rec changed the logits by 4e-4, so
+      network was effectively FEEDFORWARD. Zeroing W_rec changed the decoder's class scores
+      by a relative 4e-4, so
       "recurrence on/off" was an inert variable and the first biphase grid returned
       bit-identical accuracies for conditions meant to differ. `init_net(rec_gain=...)` now
       offers "flat" (default, reproduces the old runs) and "normalised" (same factor applied
@@ -114,7 +115,8 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
       Guarded by `test_drive_balance_and_recurrence_leverage`.
 - [x] Biphase grid re-run under both gains, artefacts named by condition:
       `results/diversity_biphase_n24_L200_recflat.*` and `..._recnormalised.*`, plus
-      `results/probe_mechanism_rec_flat_vs_norm.{txt,json,png}`. NOT yet interpreted.
+      `results/probe_mechanism_rec_flat_vs_norm.{txt,json,png}`. Interpreted into docs/E05
+      (gain-bug section) and docs/E00 (the methodology lesson, now its own page).
 - [ ] Stacked layers
 - [ ] Nested banded omega with cross-frequency modulation vs flat heterogeneity, matched
       parameters, on a long-sequence task (E07 in docs/, designed but not started)
@@ -123,52 +125,24 @@ HORN_repo_plan.md       the research plan, incl. the nested-oscillation proposal
 
 ## Next in line, explicitly
 
-1. **Interpret the new results and write them into the docs. THE NEXT TASK.**
+1. **The properly sized diversity grid, when GPU time is cheap.** The remaining gap in
+   E05: ridge on standardised features at init reaches 1.000, the trained readout at
+   pilot scale sits at chance. Before or with the scale-up, condition the readout the way
+   the probe conditions its features: standardise the pooled features (a norm before the
+   affine readout in `model.forward`, or z-scoring inside `_pool`), since that mismatch,
+   not representation, is the suspected gap. Then:
 
-   All runs are done and every artefact is on disk. Nothing further needs to be executed;
-   what is missing is the reading of them. Files awaiting interpretation:
+       python experiments/run_diversity.py --n-osc 64 --steps 800 --seeds 5
+       python experiments/run_diversity.py --n-osc 64 --steps 800 --seeds 5 --zeta 0.02
 
-   | file | what it is |
-   |---|---|
-   | `results/readout_precision_smnist.{txt,json,png}` | E06 on the paper's own task |
-   | `results/probe_mechanism_rec_flat_vs_norm.{txt,json,png}` | separability at init, both gains |
-   | `results/diversity_biphase_n24_L200_recflat.{json,png}` | grid under the inert variable |
-   | `results/diversity_biphase_n24_L200_recnormalised.{json,png}` | grid after the fix |
+   under `rec_gain="normalised"` only (flat is the documented broken instrument). If
+   heterogeneous still does not separate from homogeneous with a conditioned readout at
+   real scale, that IS reportable, as a constraint on the diversity claim at this network
+   size, and docs/E05 already has the slot for it.
 
-   What that means concretely:
-
-   - **docs/E06** — add the sMNIST run beside the biphase one. The comparison is the
-     point: sMNIST's float readout recovers by ~6 bits while biphase needs ~14, so
-     phase-coded information is MORE fragile under in-loop quantisation, not less. That
-     inverts the E08 hypothesis and should be stated as an inversion, with the mechanism,
-     not buried. Also note agreement 0.303 at 3 bits against the paper's 0.284.
-   - **docs/E05** — add the `rec_gain` story and the two grids. The honest shape is: the
-     at-init probe carries the sharp claim (W_rec=0 at chance everywhere), the trained grid
-     does not yet reproduce it, and the gap is readout conditioning rather than
-     representation. Say so.
-   - **A new docs/E00 or a section in docs/README.md** — the methodology lesson is worth
-     its own entry: an experiment whose independent variable moves the output by 4e-4 is
-     not a null result, it is a broken instrument, and the check that catches it
-     (`recurrence leverage`) costs one forward pass. This is the most transferable thing
-     in the repo.
-   - **README** — swap the headline figure to the sMNIST precision result, and update the
-     "honest limitations" section: sMNIST is now run, and the phase claim is supported at
-     initialisation but not yet through training.
-
-   Known caveat to carry into the writing: the trained biphase grid is still at chance
-   under both gains, while ridge on standardised features at init reaches 1.000. Before
-   concluding anything about frequency diversity from that grid, note that the readout
-   does not standardise its pooled features, and 60 steps at n_osc=24 is a smoke test, not
-   an experiment. Do not report the `--quick` numbers as a null result on diversity.
-
-2. **Application side** (not in this repo): rewrite the cover letter sentence that says
-   the falsifying experiment is "designed and waiting" to point at the E06 result
-   instead, once the sMNIST variant confirms; the literature PDFs listed in the
-   application folder's literature/README.md still need manual download.
-
-Do NOT start stacked layers, the nested architecture (E07), or a spiking implementation
-(E08) before the September deadline. A half-built experiment reads worse than a designed
-proposal.
+Stacked layers, the nested architecture (E07) and a spiking readout (E08) stay unstarted
+deliberately: each is specified in docs/, and the designs say more than half-built
+versions would. They start after the grid above is settled, not before.
 
 ## The open tension
 
@@ -204,7 +178,8 @@ precondition rather than a nice-to-have.
   cache: `load_mnist()` with no argument defaults to `<repo>/data`, so it is downloaded once
   rather than once per directory you happen to launch from.
 - The frequency-discrimination task at a 1-2000 Hz band over 1 s implies L = 20,000 steps,
-  which is 25x longer than pixel-wise MNIST. Watch BPTT memory; raise `dt` if it bites.
+  which is 25x longer than pixel-wise MNIST. Backpropagating gradients through that many
+  timesteps is memory-hungry; raise `dt` if it bites.
 - **The MNIST cache is version-stamped** (`CACHE_VERSION` in `data.py`). A `.npz` written by an
   older loader is detected and rebuilt rather than half-read (the first version of this failed
   with `KeyError: 'xtr'` from the middle of `load_mnist`). Bump the version whenever key names,
@@ -217,9 +192,3 @@ precondition rather than a nice-to-have.
   accuracies on perfectly separable features. Fixed in both; the E05 table was regenerated
   (`results/probe_mechanism.txt` is the committed record). If a linear probe reports
   chance on features a trained readout classifies, suspect the estimator before the data.
-- **Numbers quoted in docstrings drift.** The E05 table in `horn/tasks.py` disagreed with
-  the current code by exactly 2x in rms|x| (older task config). When a quoted table and a
-  script disagree, rerun the script; the committed txt/json in `results/` is the record.
-- **Prose style, kept deliberately:** no em-dashes anywhere (use commas, colons,
-  parentheses); no addressing the reader as "you" in docs; plain first person is fine.
-  The application documents' voice follows the same rules.

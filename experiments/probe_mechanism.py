@@ -1,4 +1,4 @@
-"""Is the mechanism even available? Ask before spending GPU hours on training.
+"""Is the mechanism even available?
 
     python experiments/probe_mechanism.py                 # both gain settings
     python experiments/probe_mechanism.py --rec-gain flat # just the old one
@@ -16,20 +16,20 @@ pooled features LINEARLY SEPARABLE by class, in an untrained network? If they ar
 not separable at initialisation, training the readout cannot help, and a sweep
 would produce a grid of chance-level numbers and no information.
 
-WHY IT NOW RUNS TWICE
----------------------
-`rec_gain="flat"` (the historical default) leaves the recurrent drive ~5000x
-weaker than the external drive, because input_gain="normalised" multiplies W_in
-by 2*zeta*omega^2 and nothing multiplies W_rec. Zeroing W_rec then changes the
-logits by 4e-4 relative: the "recurrence on/off" variable does nothing, and the
-sweep built on it measured nothing.
+IT RUNS TWICE
+`rec_gain="flat"` (the default) leaves the recurrent drive ~5000x weaker than the
+external drive, because input_gain="normalised" multiplies W_in by 2*zeta*omega^2 
+and nothing multiplies W_rec. Zeroing W_rec then changes the logits by 4e-4 relative:
+the "recurrence on/off" variable does nothing, and the sweep built on it measured nothing.
 
 `rec_gain="normalised"` applies the same factor to W_rec. Both are run here, in
 that order, so the fix can be judged against the thing it was meant to fix rather
 than asserted. Artefacts are named `..._recflat` and `..._recnormalised`.
 
+I left them so I can compare the two, but the flat version is known to be broken and
+should be ignored.
+
 MEASUREMENT NOTE
-----------------
 An early version reported the ridge classifier's TRAINING accuracy over 129
 features and 600 samples, which memorises: it reported 1.000 for conditions that
 are provably at chance. A second version scaled a constant bias column by its

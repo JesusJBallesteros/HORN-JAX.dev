@@ -1,6 +1,6 @@
 """Frequency heterogeneity, can a HORN read a biphase?
 
-    python experiments/run_diversity.py --quick        # ~2 min, smoke test
+    python experiments/run_diversity.py --quick        # ~2 min test
     python experiments/run_diversity.py                # the real grid
     python experiments/run_diversity.py --task freq    # the phase-free control task
 

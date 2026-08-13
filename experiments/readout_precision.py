@@ -1,16 +1,16 @@
-"""Readout precision: reproduce the analog paper's failure mode in simulation.
+"""Readout precision: reproduce the analog paper's in simulation.
 
     python experiments/readout_precision.py                 # biphase, no data needed
     python experiments/readout_precision.py --task smnist   # row-wise sMNIST, downloads MNIST
-    python experiments/readout_precision.py --quick         # smoke test
+    python experiments/readout_precision.py --quick         # test
 
 THE QUESTION
-arXiv:2509.04064 transferred a trained HORN to analog hardware. The dynamics matched,
-yet the digital readout agreed with its twin on only 28.39% of predictions; retraining
-a linear readout on the analog dynamics recovered full performance. The information
-survived the precision loss, the readout did not.
+Effenberger's paper [arXiv:2509.04064](https://arxiv.org/abs/2509.04064) transferred a trained HORN
+to analog hardware. The dynamics matched, yet the digital readout agreed with its twin on only
+28.39% of predictions; retraining a linear readout on the analog dynamics recovered full performance.
+The information survived the precision loss, the readout did not.
 
-This script reproduces that failure mode with quantisation as the precision-loss stand-in:
+This script reproduces that 'failure mode' with quantisation as the precision-loss stand-in:
 
   1. train a HORN + affine readout at float32
   2. re-run inference with the STATE quantised to n bits inside the recurrent loop,
@@ -44,9 +44,9 @@ from horn.tasks import DEFAULT_BIPHASES, biphase_batch
 from horn.training import train
 
 
-# ---------------------------------------------------------------- quantiser
+# quantize
 
-def quantise(z, scale, bits):
+def quantize(z, scale, bits):
     """Symmetric uniform quantiser to 2^bits levels over [-scale, scale]."""
     levels = 2 ** bits - 1
     zc = jnp.clip(z, -scale, scale)
@@ -61,8 +61,8 @@ def run_traj(params, inputs, dt, bits=None, scales=None):
     def body(carry, u):
         new, _ = horn_step(params.horn, carry, u, dt)
         if bits is not None:
-            new = new._replace(x=quantise(new.x, scales[0], bits),
-                               v=quantise(new.v, scales[1], bits))
+            new = new._replace(x=quantize(new.x, scales[0], bits),
+                               v=quantize(new.v, scales[1], bits))
         return new, (new.x, new.v)
 
     _, (xs, vs) = jax.lax.scan(body, state, inputs)
@@ -111,7 +111,7 @@ def ridge_split(feats, labels, n_classes, seed=0):
     return float((pred == labels[te]).mean()), te, pred
 
 
-# ---------------------------------------------------------------- tasks
+# tasks
 
 def setup_biphase(quick):
     L, dt, n_osc = 400, 2.5e-3, 64
@@ -154,7 +154,7 @@ def setup_smnist(quick):
     return params, batch_fn, dt, "meanrms", 10, steps, n_eval
 
 
-# ---------------------------------------------------------------- main
+# main
 
 def main():
     ap = argparse.ArgumentParser()
@@ -207,8 +207,8 @@ def main():
         # sampled: float dynamics, quantised only at observation, the ADC control.
         # If only this mattered, precision would be a measurement problem, not a
         # dynamics problem; pooling over T steps averages most of it away.
-        fs_ = features(params, quantise(xs, scales[0], b),
-                       quantise(vs, scales[1], b), pool)
+        fs_ = features(params, quantize(xs, scales[0], b),
+                       quantize(vs, scales[1], b), pool)
         acc_s, _ = readout_acc(fs_)
         acc_s_ridge, _, _ = ridge_split(fs_, Y, n_classes)
 

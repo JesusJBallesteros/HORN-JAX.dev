@@ -43,10 +43,13 @@ Full write-ups, one page per experiment, in [`docs/`](docs/README.md). The headl
 
 ![sMNIST training](results/smnist_training.png)
 
-**Pooling decides whether a task is learnable at all** ([E02](docs/E02_gain_and_pooling.md)).
-Frequency discrimination with identical models: mean 0.34, last 0.35, **rms 1.00**. A
-sinusoidal response time-averages to nearly zero, and the mean/rms ratio falls with
-frequency, so mean-pooling discards precisely the signal from the units working hardest.
+**The summary statistic handed to the decoder decides whether a task is learnable at all**
+([E02](docs/E02_gain_and_pooling.md)). The readout does not see the response time series; it
+sees one number per unit and channel, the "pooling". Frequency discrimination with identical
+models, decoded from the time-mean, the final state, or the response power (rms): mean 0.34,
+last 0.35, **rms 1.00**. A sinusoidal response time-averages to nearly zero, and the
+mean/rms ratio falls with frequency, so decoding from the time-mean discards precisely
+the signal from the units working hardest.
 
 ![pooling ablation](results/freqdisc_pooling_ablation.png)
 
@@ -58,25 +61,39 @@ pull in different directions.
 
 ![frozen vs learned](results/smnist_row_frozen_vs_learned.png)
 
-**Phase is not yet doing the work** ([E05](docs/E05_biphase.md)). Every trained result above
-is reachable by a filter bank and a power readout. The biphase task exists to change that: the
-class is the relative phase of two tones whose power spectrum is identical by construction. At
-initialisation the probe already shows the sharp result. `W_rec = 0` is at chance at every
-amplitude, while recurrence plus an engaged nonlinearity reaches 1.00. The trained
-heterogeneous-vs-homogeneous grid is the next run.
+**The analog paper's readout collapse, reproduced and dissected**
+([E06](docs/E06_readout_precision.md)). The analog HORN paper found its digital readout
+agreeing with the hardware on only 28.4% of predictions, recoverable by retraining a linear
+readout. Reproduced here on the paper's own task with state precision as the controlled
+variable, the computational analogue of an electrode's ADC bit depth, except applied inside
+the dynamics: on row-wise sMNIST with the state rounded to n bits at every timestep, the
+decoder trained at full precision collapses (agreement 0.13 at 1 bit) while a ridge decoder
+refit on the degraded activity recovers, 0.31 to 0.70 at 3 bits. The pattern is the paper's,
+collapse plus recovery; the hardware's 28% agreement corresponds to an operating point
+somewhere on this curve. Rounding only the observed activity, leaving the dynamics at full
+precision, is nearly harmless: the damage is done where the dynamics live.
 
-**The readout is the fragile part, not the dynamics** ([E06](docs/E06_readout_precision.md)).
-The analog HORN paper found its digital readout agreeing with the hardware on only 28% of
-predictions, recoverable by retraining a linear readout. Reproduced here with state precision
-as the controlled variable: with the state quantised inside the recurrent loop, a retrained
-ridge readout still classifies perfectly at 3 bits, while the float-trained readout collapses
-below 14 bits and bottoms out at 26% agreement. Quantising only the observation barely hurts,
-so the damage is done where the dynamics live, and a substrate-adapted readout is worth about
-11 bits of state precision.
+![readout precision, sMNIST](results/readout_precision_smnist.png)
 
-![readout precision](results/readout_precision_biphase.png)
+Running the same protocol on the biphase task inverts an intuition (one seed per task, so
+a pattern to test, not a theorem): the phase-coded readout needs 14 bits where sMNIST
+needs 6, while its information survives lower precision (ridge recovers 1.000 at 3 bits).
+Phase coding protects the information and endangers the mapping; amplitude coding does the
+reverse. Any spiking-readout robustness claim (E08) now has a measured baseline to beat
+rather than an assumed one.
 
-![readout precision sMINST](results/readout_precision_smnist.png)
+**Phase is not yet doing the work through training** ([E05](docs/E05_biphase.md)). Every
+trained result above is reachable by a filter bank and a power readout. The biphase task
+exists to change that: the class is the relative phase of two tones whose power spectrum is
+identical by construction. At initialisation the probe shows the sharp result under both
+gain conventions: `W_rec = 0` is at chance at every amplitude, while recurrence plus an
+engaged nonlinearity reaches 1.00. The first trained grid was an instrument failure worth
+reading about ([E00](docs/E00_measure_the_lever.md)): a gain asymmetry left the network
+feedforward in all but name, recurrence moved the decoder's class scores by a relative
+4e-4, and conditions meant to differ came back bit-identical. Fixed
+(`rec_gain="normalised"`, leverage 3.6e-3 to 0.37),
+re-run at pilot scale, currently inconclusive; the properly sized grid is the remaining
+run.
 
 ## Layout
 
@@ -91,8 +108,10 @@ experiments/probe_mechanism.py   separability at init: which pooling, which regi
 experiments/run_diversity.py     heterogeneous-vs-homogeneous grid on the biphase task
 experiments/readout_precision.py quantised state, in-loop vs sampled, readout recovery
 tests/test_dynamics.py           5 tests: physics against closed-form solutions
-tests/test_model.py              8 tests: shapes, gradients, plumbing
+tests/test_model.py              10 tests: shapes, gradients, plumbing, drive balance
 tests/test_tasks.py              7 tests: task construction, matched spectra, no label leaks
+tests/test_data.py               6 tests: IDX parsing, cache validation, scaling
+tests/test_paths.py              4 tests: path anchoring, no import side effects
 docs/                            experiment log, one page each: question, result, reproduce
 results/                         committed figures and run records
 notebooks/01_test_core.ipynb     validation against analytic solutions
@@ -119,8 +138,8 @@ Ordered roughly by how much they changed what I did next.
 
 1. **Amplitude collapse, and the two fixes it forced.** Steady-state response scales as
    `1/(2ζω²)`, so fast units are quiet units. With a flat `W_in` the population produces states
-   of order 1e-6, the softmax is uniform, the loss sits at exactly `ln(n_classes)` and gradients
-   are ~1e-4. It looks exactly like a learning-rate problem and is not. Scaling each row of
+   of order 1e-6, the decoder's class probabilities are uniform, the loss sits at exactly
+   `ln(n_classes)`, the value of pure guessing, and gradients are ~1e-4. It looks exactly like a learning-rate problem and is not. Scaling each row of
    `W_in` by `2ζω²` fixes it; `rms` pooling fixes the readout side.
 
 2. **The usable frequency ratio is set by sequence length alone**, at roughly `L/10`. A unit
@@ -148,14 +167,21 @@ Ordered roughly by how much they changed what I did next.
    uncertainty principle appearing inside a network layer, and it constrains what any fixed
    oscillator bank can do on short sequences.
 
+6. **Measure the lever before pulling it.** A sweep whose independent variable moves the
+   output by 4e-4 is not a null result, it is a broken instrument, and its table looks
+   exactly like ordinary results. The check costs one forward pass per variable.
+   [E00](docs/E00_measure_the_lever.md) is this lesson written out; it has already caught
+   three separate one-line bugs in this repo.
+
 ## Limitations
 
 - **The sMNIST numbers are baselines, not comparisons.** One small single-layer model, default
-  hyperparameters, no stacking, no tuning. They exist to anchor the repo's own ablations, not
+  settings, no stacking, no tuning. They exist to anchor the repo's own ablations, not
   to be placed next to published HORN results.
-- **No task has yet been *trained* where phase wins.** The biphase probe shows the mechanism
-  exists at initialisation; the trained grid (`run_diversity.py`) has not been run to
-  completion.
+- **The phase claim is supported at initialisation, not yet through training.** The biphase
+  probe shows the mechanism exists in an untrained network, under both gain conventions. The
+  trained grid has only run at pilot scale, and its first version was invalidated by
+  the rec-gain bug (E00); a properly sized run with a conditioned readout is still owed.
 - **Single layer only.** No claim here bears on depth.
 - **No comparison against `brainmass`.** Independent implementation validated against physics,
   not against the reference.
@@ -168,7 +194,7 @@ uv venv --python 3.12 && source .venv/bin/activate
 
 uv pip install -e ".[dev,notebooks]"        # CPU
 # uv pip install -e ".[cuda,dev,notebooks]" # NVIDIA GPU
-pytest                                      # 20 passed. Also see TESTING.md
+pytest                                      # 32 passed. Also see TESTING.md
 python demo.py                              # writes results/demo.png
 jupyter lab notebooks/                      # 01 then 02
 ```
@@ -182,9 +208,10 @@ MNIST downloads on first use and caches to `data/mnist.npz`.
 - [x] Frequency discrimination trained to ceiling
 - [x] Sequential MNIST, row-wise and pixel-wise
 - [x] Frozen vs learned (ω, ζ)
-- [x] Readout precision: the analog paper's readout collapse, reproduced and dissected
-- [ ] Biphase: trained heterogeneous-vs-homogeneous grid, where `rms` pooling must lose
-- [ ] Readout precision on sMNIST (`--task smnist`), the task the analog paper used
+- [x] Readout precision: the analog paper's readout collapse, reproduced and dissected on
+      biphase and on sMNIST, the paper's own task
+- [ ] Biphase: properly sized trained grid (the smoke-scale run is recorded but
+      inconclusive; see E05)
 - [ ] Stacked layers
 - [ ] Nested banded ω with cross-frequency modulation vs flat heterogeneity, matched parameters
 - [ ] Spiking readout: does phase coding degrade more gracefully than a continuous readout?

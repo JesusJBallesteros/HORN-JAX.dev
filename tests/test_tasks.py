@@ -1,7 +1,7 @@
 """Validity tests for the synthetic tasks.
 
-These are not plumbing checks. The biphase experiment rests on three claims about
-the STIMULUS, and if any of them is false the experiment measures nothing:
+The biphase experiment rests on three claims about the STIMULUS, and if any of them
+ is false the experiment measures nothing:
 
   1. the power spectrum is the same for every class, so `pool="rms"` is at chance
      by construction rather than by observation;

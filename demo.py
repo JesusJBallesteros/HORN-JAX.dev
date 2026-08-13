@@ -13,6 +13,7 @@ horn/paths.py for why that is not the same as the working directory.
 """
 
 import jax.numpy as jnp
+import numpy as np
 import matplotlib
 matplotlib.use("Agg")          # non-interactive backend: renders straight to file.
                                # Required when running headless (WSL without an X server),
@@ -22,8 +23,12 @@ import matplotlib.pyplot as plt
 from horn.core import HORNParams, HORNState, run_sequence
 from horn.paths import results
 
+TWOPI = 2 * np.pi
 
-def isolated(n, omega, zeta):
+def w_rads(f_hz):   # Conversion Hz -> rad/s
+    return TWOPI * np.asarray(f_hz, dtype=float)
+
+def isolated(n, f_hz, zeta):
     """A HORN with coupling zeroed out -> n independent oscillators.
 
     Same helper as in the tests: with W_in and W_rec both zero the drive term
@@ -33,18 +38,18 @@ def isolated(n, omega, zeta):
     return HORNParams(
         W_in=jnp.zeros((n, 1)),                                             # no input drive
         W_rec=jnp.zeros((n, n)),                                            # no coupling
-        log_omega=jnp.log(jnp.asarray(omega, jnp.float32) * jnp.ones(n)),   # omega -> log
+        log_omega=jnp.log(jnp.asarray(w_rads(f_hz), jnp.float32) * jnp.ones(n)),   # omega -> log
         log_zeta=jnp.log(jnp.asarray(zeta, jnp.float32) * jnp.ones(n)),     # zeta  -> log
     )
 
 
-dt, T = 1e-3, 8000                  # 1 ms steps for 8 s of simulated time
+dt, T = 5e-5, 40000                  # time step and number of steps, so 2 seconds total
 t = jnp.arange(T) * dt              # time axis in seconds, for plotting
 fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))   # one row, two panels, size (inches)
 
 # LEFT PANEL: damping controls how long a unit remembers
-for zeta, label in [(0.05, "underdamped  z=0.05"),   # rings for a long time = long memory
-                    (0.35,  "underdamped  z=0.35"),    # a few visible oscillations
+for zeta, label in [(0.02, "underdamped  z=0.02"),   # rings for a long time = long memory
+                    (0.2,  "damped  z=0.2"),    # a few visible oscillations
                     (1.0,  "critical     z=1.0"),    # fastest return with no overshoot
                     (2.5,  "overdamped   z=2.5")]:   # sluggish crawl, never crosses zero
     p = isolated(1, 8, zeta)                              # one unit, omega fixed at 8
@@ -57,8 +62,8 @@ ax[0].legend(fontsize=8, frameon=False)
 ax[0].axhline(0, color="k", lw=0.5)   # zero line, to make overshoot easy to see
 
 # RIGHT PANEL: heterogeneous omega = a bank of filters
-omegas = jnp.array([2.0, 4.0, 8.0, 16.0])   # octave spacing, so ratios are easy to read off
-p = isolated(4, omegas, 0.05)              # four units, one per frequency, lightly damped
+omegas = jnp.array([2.0, 4.0, 8.0, 32.0])   # octave spacing, so ratios are easy to read off
+p = isolated(4, omegas, 0.02)              # four units, one per frequency, lightly damped
 s0 = HORNState(x=jnp.ones((4,)), v=jnp.zeros((4,)))   # all four released together
 _, xs = run_sequence(p, s0, jnp.zeros((T, 1)), dt)    # xs is (T, 4): one column per unit
 

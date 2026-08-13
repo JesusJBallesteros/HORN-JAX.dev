@@ -11,7 +11,6 @@ dist/
 .pytest_cache/
 .ruff_cache/
 .ipynb_checkpoints/
-HORN_repo_plan.md
 
 # Outputs
 # Figures are ignored by default, but anything
