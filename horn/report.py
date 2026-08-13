@@ -29,11 +29,15 @@ from horn.paths import results
 def _git_commit() -> str:
     """Short commit hash, so a figure can be traced back to the code that made it."""
     try:
+        # cwd is the repo root (two levels up from this file), not the caller's
+        # directory, so the hash is this repo's even when run from elsewhere.
         out = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
                              capture_output=True, text=True, timeout=5,
                              cwd=Path(__file__).resolve().parent.parent)
         return out.stdout.strip() or "unknown"
     except Exception:                                  # noqa: BLE001
+        # Never let provenance-gathering kill a run: no git, no repo, or a timeout
+        # all degrade to "unknown" rather than raising.
         return "unknown"
 
 
@@ -41,10 +45,10 @@ class Report:
     """Tee stdout to results/<name>.txt and collect sibling artefacts."""
 
     def __init__(self, name: str, header: str = ""):
-        self.name = name
+        self.name = name                          # shared stem for .txt/.json/.png
         self.path = results(f"{name}.txt")
-        self._lines: list[str] = []
-        self.artefacts: list[Path] = [self.path]
+        self._lines: list[str] = []               # buffered; written once at exit
+        self.artefacts: list[Path] = [self.path]  # everything this run produced
 
         # A provenance header on every table. Six months from now the question is
         # always "which version of the code produced this number".
@@ -57,17 +61,21 @@ class Report:
         self._lines.append("")
 
     def print(self, *args, **kwargs):
+        """Like print(), but the line is also kept for the transcript."""
         text = " ".join(str(a) for a in args)
-        print(text, **kwargs)
-        self._lines.append(text)
+        print(text, **kwargs)                     # to the console, as normal
+        self._lines.append(text)                  # and to the buffer
 
     def save_json(self, obj) -> Path:
+        """Machine-readable record beside the human-readable one."""
         path = results(f"{self.name}.json")
+        # default=str so numpy scalars and Paths serialise instead of raising
         path.write_text(json.dumps(obj, indent=2, default=str))
         self.artefacts.append(path)
         return path
 
     def save_fig(self, fig, suffix: str = "") -> Path:
+        """Save a figure under the run's stem; `suffix` distinguishes several."""
         stem = f"{self.name}{'_' + suffix if suffix else ''}"
         path = results(f"{stem}.png")
         fig.savefig(path, dpi=130, bbox_inches="tight")
@@ -75,6 +83,7 @@ class Report:
         return path
 
     def flush(self):
+        """Write the buffered transcript to disk (called automatically on exit)."""
         self.path.write_text("\n".join(self._lines) + "\n")
 
     def __enter__(self):
@@ -82,11 +91,12 @@ class Report:
 
     def __exit__(self, exc_type, exc, tb):
         # Write even on failure: a partial transcript of a crashed run is often
-        # exactly what you need to see.
+        # exactly the thing needed to diagnose it.
         if exc is not None:
             self._lines.append(f"\n!! run failed: {exc_type.__name__}: {exc}")
         self.flush()
+        # File list to stderr, so piping stdout to a file still shows where things went.
         print("\nwrote:", file=sys.stderr)
         for p in self.artefacts:
             print(f"  {p}", file=sys.stderr)
-        return False
+        return False          # False = do not suppress the exception; let it propagate

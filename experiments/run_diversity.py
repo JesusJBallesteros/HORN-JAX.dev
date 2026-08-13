@@ -63,7 +63,12 @@ from horn.training import binomial_sd, evaluate_stream, train
 
 
 def build(key, cfg, omega_kind, recurrence):
-    """One network. `omega_kind` and `recurrence` are the two variables."""
+    """One network. `omega_kind` and `recurrence` are the two manipulated variables.
+
+    Both conditions have IDENTICAL parameter counts: homogeneous_bands returns the
+    same-shaped vector as log_spaced_bands, just with every entry equal. Only the
+    spread of natural frequencies differs, which is what makes the comparison fair.
+    """
     bands = (log_spaced_bands if omega_kind == "heterogeneous" else homogeneous_bands)
     params = init_net(key, 1, cfg["n_osc"], cfg["n_classes"],
                       f_hz=bands(cfg["n_osc"], cfg["f_lo"], cfg["f_hi"]),
@@ -109,10 +114,12 @@ def main():
     args = ap.parse_args()
 
     if args.quick:
+        # Pilot settings: enough to prove the pipeline runs end to end, far too
+        # small to support a conclusion. Recorded in docs/E05 as such.
         args.n_osc, args.steps, args.seeds, args.n_steps = 24, 60, 2, 200
         args.eval_n, args.pools = 256, ["rms", "meanrms"]
 
-    f_lo, f_hi = usable_band(args.n_steps, args.dt)
+    f_lo, f_hi = usable_band(args.n_steps, args.dt)   # what this L and dt can represent
     n_classes = len(DEFAULT_BIPHASES) if args.task == "biphase" else 3
 
     if args.task == "biphase":
@@ -139,6 +146,8 @@ def main():
                pool_widest="meanrms")
 
     records = []
+    # Full factorial: every pooling x frequency structure x recurrence x seed. Seeds
+    # are the innermost factor so consecutive lines in the log are directly comparable.
     grid = list(itertools.product(args.pools, ["heterogeneous", "homogeneous"],
                                  ["free", "off"], range(args.seeds)))
     t_start = time.time()
@@ -149,9 +158,12 @@ def main():
         cfg_run = dict(cfg, pool_widest=pool)
         params = build(jax.random.PRNGKey(seed), cfg_run, omega_kind, recurrence)
 
+        # freeze_rec keeps the zeroed coupling at zero: without it, gradient descent
+        # would immediately repopulate W_rec and the "off" condition would not be off.
         params, hist = train(params, batch_fn, args.dt, pool, steps=args.steps,
                              batch=args.batch, lr=args.lr, seed=seed,
                              freeze_rec=(recurrence == "off"), log=False)
+        # Fresh trials from the generator, fixed evaluation seed across conditions.
         acc = evaluate_stream(params, batch_fn, args.dt, pool, n=args.eval_n)
 
         records.append(dict(pool=pool, omega=omega_kind, recurrence=recurrence,
@@ -164,9 +176,12 @@ def main():
     print(f"\ntotal {time.time() - t_start:.0f}s")
     summarise(records, n_classes, args.eval_n)
 
+    # Name artefacts by the condition that produced them, so two runs differing only
+    # in rec_gain cannot overwrite each other's figures.
     tag = args.tag or (f"{args.task}_n{args.n_osc}_L{args.n_steps}"
                        f"_rec{args.rec_gain}")
     out = results(f"diversity_{tag}.json")
+    # vars(args) stores every setting, so the JSON alone reconstructs the run.
     out.write_text(json.dumps({"config": vars(args), "n_classes": n_classes,
                                "f_lo": f_lo, "f_hi": f_hi,
                                "records": records}, indent=2))
@@ -176,10 +191,13 @@ def main():
 
 
 def summarise(records, n_classes, eval_n):
+    """Condition means with a sigma-above-chance column."""
     chance = 1.0 / n_classes
-    sd = binomial_sd(chance, eval_n)
+    sd = binomial_sd(chance, eval_n)          # noise floor of a single evaluation
     print(f"\n{'pool':>8} {'omega':>14} {'W_rec':>6}   mean    sd     sigma above chance")
     print("-" * 68)
+    # dict.fromkeys preserves first-seen order while removing duplicates, so the
+    # table rows follow the order the pools were requested in.
     for pool in dict.fromkeys(r["pool"] for r in records):
         for omega_kind in ["heterogeneous", "homogeneous"]:
             for rec in ["free", "off"]:
@@ -196,8 +214,9 @@ def summarise(records, n_classes, eval_n):
 
 
 def plot(records, n_classes, path, title):
+    """Grouped bars: one cluster per pooling, one bar per condition, error bars = SD."""
     import matplotlib
-    matplotlib.use("Agg")
+    matplotlib.use("Agg")          # headless backend; must be set before pyplot import
     import matplotlib.pyplot as plt
 
     pools = list(dict.fromkeys(r["pool"] for r in records))
@@ -215,6 +234,7 @@ def plot(records, n_classes, path, title):
                     and r["omega"] == omega_kind and r["recurrence"] == rec]
             means.append(np.mean(accs) if accs else np.nan)
             errs.append(np.std(accs) if accs else 0.0)
+        # Offset each condition's bars around the cluster centre so they sit side by side
         xs = np.arange(len(pools)) + (j - (len(conds) - 1) / 2) * width
         ax.bar(xs, means, width, yerr=errs, capsize=3, label=lab)
 

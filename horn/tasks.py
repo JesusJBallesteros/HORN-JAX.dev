@@ -110,16 +110,19 @@ def homogeneous_bands(n_osc: int, f_lo: float, f_hi: float) -> jnp.ndarray:
 def freq_batch(key, n, classes=(8.0, 32.0, 150.0), n_steps=20000, dt=5e-5,
                noise=0.3):
     """Noisy sinusoid at one of `classes` Hz, random phase. -> (L, n, 1), (n,)."""
-    k_y, k_p, k_n = jax.random.split(key, 3)
+    k_y, k_p, k_n = jax.random.split(key, 3)     # separate keys: label, phase, noise
     classes = jnp.asarray(classes, jnp.float32)
 
-    y = jax.random.randint(k_y, (n,), 0, len(classes))
-    phase = jax.random.uniform(k_p, (n,)) * TWOPI
-    t = jnp.arange(1, n_steps + 1) * dt
+    y = jax.random.randint(k_y, (n,), 0, len(classes))   # class index per trial
+    phase = jax.random.uniform(k_p, (n,)) * TWOPI        # random start phase, so absolute
+                                                         # phase carries no label information
+    t = jnp.arange(1, n_steps + 1) * dt                  # time axis in seconds
 
+    # Outer-product broadcasting: t[:, None] is (L, 1) and the per-trial terms are
+    # (1, n), so the result is (L, n) without any explicit loop over trials.
     x = jnp.sin(TWOPI * classes[y][None, :] * t[:, None] + phase[None, :])
     x = x + noise * jax.random.normal(k_n, (n_steps, n))
-    return x[..., None], y
+    return x[..., None], y                        # trailing axis = input channel of width 1
 
 
 def biphase_batch(key, n, f_hz=10.0, n_steps=400, dt=2.5e-3,
@@ -133,9 +136,9 @@ def biphase_batch(key, n, f_hz=10.0, n_steps=400, dt=2.5e-3,
     Noise is additive white, so it raises the floor equally for every class and
     cannot leak label information.
     """
-    k_y, k_p, k_n = jax.random.split(key, 3)
+    k_y, k_p, k_n = jax.random.split(key, 3)     # separate keys: label, phase, noise
     psi_values = jnp.asarray(biphases, jnp.float32)
-    a1, a2 = amps
+    a1, a2 = amps                                # fixed amplitudes, never drawn
 
     y = jax.random.randint(k_y, (n,), 0, len(psi_values))
     p = jax.random.uniform(k_p, (n,)) * TWOPI          # global phase, per example
@@ -143,7 +146,10 @@ def biphase_batch(key, n, f_hz=10.0, n_steps=400, dt=2.5e-3,
     t = jnp.arange(1, n_steps + 1) * dt
 
     fundamental = a1 * jnp.sin(TWOPI * f_hz * t[:, None] + p[None, :])
-    # The 2*p is essential: it is what makes psi invariant to a time shift.
+    # The 2*p is essential: it is what makes psi invariant to a time shift. Shifting
+    # t by d adds 2*pi*f*d to the fundamental's phase and twice that to the harmonic's,
+    # so the combination phi2 - 2*phi1 = psi is left untouched. Without the factor of
+    # two, psi would be recoverable from absolute timing and the task would be trivial.
     harmonic = a2 * jnp.sin(TWOPI * 2 * f_hz * t[:, None] + 2 * p[None, :]
                             + psi[None, :])
 
@@ -163,14 +169,17 @@ def power_spectrum_by_class(key, n_per_class=256, **kw):
 
     rows = []
     for i in range(len(biphases)):
-        # One class at a time, by passing a single-element biphase tuple.
+        # One class at a time, by passing a single-element biphase tuple. The same
+        # `key` is reused deliberately, so the trials differ ONLY in psi and the
+        # comparison is not confounded by different noise draws.
         single = dict(kw, biphases=(biphases[i],))
         x, _ = biphase_batch(key, n_per_class, **single)
+        # rfft over time (axis 0) of the single input channel; squared magnitude = power
         spec = np.abs(np.fft.rfft(np.asarray(x)[:, :, 0], axis=0)) ** 2
-        rows.append(spec.mean(axis=1))
+        rows.append(spec.mean(axis=1))           # average over trials within the class
 
-    freqs = np.fft.rfftfreq(np.asarray(x).shape[0], dt)
-    return freqs, np.stack(rows)
+    freqs = np.fft.rfftfreq(np.asarray(x).shape[0], dt)   # bin centres in Hz
+    return freqs, np.stack(rows)                          # (n_classes, n_freqs)
 
 
 # np.angle measures phase against a COSINE; biphase_batch builds the stimulus
@@ -197,9 +206,14 @@ def biphase_of(signal: np.ndarray, f_hz: float, dt: float) -> float:
     cross-frequency coupling has emerged internally.
     """
     n = len(signal)
-    spec = np.fft.rfft(signal)
+    spec = np.fft.rfft(signal)                   # real FFT: non-negative frequencies only
     freqs = np.fft.rfftfreq(n, dt)
+    # Nearest bin to f and 2f. Nearest rather than exact because f need not fall on a
+    # bin centre; if it does not, the recovered phase is slightly biased, which is why
+    # the tests use frequencies that divide the sequence length evenly.
     i1 = int(np.argmin(np.abs(freqs - f_hz)))
     i2 = int(np.argmin(np.abs(freqs - 2 * f_hz)))
+    # The biphase proper: phase of the harmonic minus twice the phase of the fundamental.
     raw = np.angle(spec[i2]) - 2 * np.angle(spec[i1])
+    # Remove the sine-versus-cosine convention offset, then wrap into [0, 2pi).
     return float(raw - _SIN_TO_COS_BIPHASE_OFFSET) % (2 * np.pi)

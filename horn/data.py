@@ -1,5 +1,9 @@
-"""MNIST loading.
+"""MNIST loading, with a version-stamped cache and no synthetic fallback.
 
+The one policy worth stating: if the data cannot be obtained, this module RAISES.
+An earlier habit of substituting random arrays on failure produces a warning that
+scrolls off the screen and a plausible accuracy computed on noise, which is worse
+than a crash because it is not visibly wrong.
 """
 
 from __future__ import annotations
@@ -48,12 +52,16 @@ def _read_idx(raw: bytes) -> np.ndarray:
     the offsets (16 for images, 8 for labels) means a truncated or mislabelled
     file fails here rather than silently reshaping into garbage.
     """
+    # ">HBB" = big-endian: uint16 magic, uint8 dtype code, uint8 number of dimensions
     zero, dtype_code, ndim = struct.unpack(">HBB", raw[:4])
     if zero != 0:
         raise ValueError(f"not an IDX file (leading bytes {zero:#06x}, expected 0x0000)")
     if dtype_code != 0x08:
         raise ValueError(f"expected uint8 IDX data (0x08), got {dtype_code:#04x}")
+    # Then `ndim` big-endian uint32 sizes: (60000, 28, 28) for the training images.
     dims = struct.unpack(f">{ndim}I", raw[4 : 4 + 4 * ndim])
+    # frombuffer is a zero-copy view starting past the header; reshape applies the
+    # parsed dimensions, so a truncated file raises here instead of silently working.
     return np.frombuffer(raw, dtype=np.uint8, offset=4 + 4 * ndim).reshape(dims)
 
 
@@ -73,7 +81,8 @@ def _cache_is_current(cached: dict) -> bool:
 
 
 def _fetch(name: str) -> bytes:
-    errors = []
+    """Download and gunzip one IDX file, trying each mirror in turn."""
+    errors = []                                   # collected so the failure names them all
     for mirror in MIRRORS:
         try:
             print(f"  fetching {name} from {mirror.split('/')[2]} ...", flush=True)
@@ -117,11 +126,15 @@ def load_mnist(cache_dir: str | Path | None = None, scale: str = "unit"):
 
     out = None
     if npz.exists():
+        # np.load is lazy, so materialise everything inside the context manager;
+        # after the `with` block closes, the file handle is gone.
         with np.load(npz) as d:
             cached = {k: d[k] for k in d.files}
         if _cache_is_current(cached):
             out = cached
         else:
+            # Delete rather than overwrite in place, so a half-written file from an
+            # interrupted run cannot survive as a valid-looking cache.
             print(f"  cache at {npz} was written by an older loader "
                   f"(keys {sorted(k for k in cached if not k.startswith('_'))}); rebuilding")
             npz.unlink()
@@ -131,8 +144,10 @@ def load_mnist(cache_dir: str | Path | None = None, scale: str = "unit"):
         out = {}
         for key, fname in FILES.items():
             arr = _read_idx(_fetch(fname))
+            # Images ("x*") to float32 in [0, 1]; labels to int32 class indices.
             out[key] = (arr.astype(np.float32) / 255.0 if key.startswith("x")
                         else arr.astype(np.int32))
+        # Stamp the version INTO the archive, so the check above is self-contained.
         np.savez_compressed(npz, _version=np.asarray(CACHE_VERSION), **out)
         print(f"  cached to {npz}")
 

@@ -7,8 +7,12 @@ can be launched from any working directory.
 
 from pathlib import Path
 
-PACKAGE_DIR = Path(__file__).resolve().parent
-REPO = PACKAGE_DIR.parent
+# Anchor on THIS file's location, not the working directory. __file__ is horn/paths.py,
+# so its parent is horn/ and the grandparent is the repo root. This is what makes
+# `plt.savefig(results("x.png"))` land in the same place whatever directory the script
+# or notebook was launched from.
+PACKAGE_DIR = Path(__file__).resolve().parent   # .../horn
+REPO = PACKAGE_DIR.parent                       # .../HORN-JAX.dev
 
 # If the package was installed NON-editably it lives in site-packages, whose
 # parent is not a useful anchor for data or figures. Fall back to the working

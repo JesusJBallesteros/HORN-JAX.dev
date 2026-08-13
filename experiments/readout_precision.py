@@ -48,19 +48,28 @@ from horn.training import train
 
 def quantize(z, scale, bits):
     """Symmetric uniform quantiser to 2^bits levels over [-scale, scale]."""
-    levels = 2 ** bits - 1
-    zc = jnp.clip(z, -scale, scale)
+    levels = 2 ** bits - 1                      # e.g. 3 bits -> 8 levels -> 7 intervals
+    zc = jnp.clip(z, -scale, scale)             # saturate rather than wrap; wrapping would
+                                                # turn a large excursion into a small one
+    # Map [-scale, scale] onto [0, 1], round to the nearest level, then map back.
     return jnp.round((zc + scale) / (2 * scale) * levels) / levels * 2 * scale - scale
 
 
 def run_traj(params, inputs, dt, bits=None, scales=None):
-    """Trajectories (xs, vs), with the state optionally quantised INSIDE the loop."""
+    """Trajectories (xs, vs), with the state optionally quantised INSIDE the loop.
+
+    bits=None gives the full-precision reference run. Otherwise the state is rounded
+    at every timestep, which is the analog case: the rounded value is what carries
+    into the next step, so the error enters the dynamics and compounds.
+    """
     n_osc = params.horn.log_omega.shape[0]
-    state = init_state(n_osc, batch=inputs.shape[1])
+    state = init_state(n_osc, batch=inputs.shape[1])   # inputs are (T, B, in_size)
 
     def body(carry, u):
         new, _ = horn_step(params.horn, carry, u, dt)
         if bits is not None:
+            # x and v get separate scales because their magnitudes differ by ~omega;
+            # one shared scale would waste every level on one of the two.
             new = new._replace(x=quantize(new.x, scales[0], bits),
                                v=quantize(new.v, scales[1], bits))
         return new, (new.x, new.v)
@@ -70,7 +79,10 @@ def run_traj(params, inputs, dt, bits=None, scales=None):
 
 
 def features(params, xs, vs, pool):
+    """Pool a trajectory into decoder features, using the model's own _pool."""
     omega = jnp.exp(params.horn.log_omega)
+    # np.asarray pulls the result out of JAX: everything downstream is host-side
+    # linear algebra with no tracing or gradients needed.
     return np.asarray(_pool(xs, vs / omega, pool))
 
 
@@ -101,6 +113,8 @@ def ridge_split(feats, labels, n_classes, seed=0):
         B = np.concatenate([Y[tr], np.zeros((F.shape[1], n_classes))])
         return np.linalg.lstsq(A, B, rcond=None)[0]
 
+    # Select lambda on the validation split, report on the untouched test split, so
+    # the reported number is not inflated by having chosen the best of six on it.
     best, best_va = None, -1.0
     for lam in (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1):
         W = fit(lam)
@@ -139,17 +153,21 @@ def setup_smnist(quick):
     params = init_net(jax.random.PRNGKey(0), 28, n_osc, 10,
                       f_hz=log_spaced_bands(n_osc, f_lo, f_hi),
                       zeta=0.15, pool="meanrms")
+    # (N, 28, 28) -> (28, N, 28): rows become timesteps, so the image is presented as
+    # a sequence of 28 row-vectors. transpose(1, 0, 2) puts time on the leading axis.
     XTR = jnp.asarray(xtr.transpose(1, 0, 2))
     YTR = jnp.asarray(ytr)
     XTE = jnp.asarray(xte.transpose(1, 0, 2))
     YTE = jnp.asarray(yte)
 
     def batch_fn(key, n):
-        idx = jax.random.randint(key, (n,), 0, XTR.shape[1])
-        return XTR[:, idx, :], YTR[idx]
+        idx = jax.random.randint(key, (n,), 0, XTR.shape[1])   # sample with replacement
+        return XTR[:, idx, :], YTR[idx]                        # index the BATCH axis
 
     steps = 100 if quick else 1500
     n_eval = 500 if quick else 2000
+    # Stashed on the function object so main() can reach the real held-out split
+    # without threading another return value through both setup functions.
     setup_smnist.eval_data = (XTE[:, :n_eval, :], YTE[:n_eval])
     return params, batch_fn, dt, "meanrms", 10, steps, n_eval
 
@@ -178,18 +196,27 @@ def main():
         X, Y = setup_smnist.eval_data
     Y = np.asarray(Y)
 
-    # float reference run, also the quantiser calibration
+    # Full-precision reference run. It serves three purposes: the accuracy ceiling,
+    # the predictions that "agreement" is measured against, and the quantiser range.
     xs, vs = run_traj(params, X, dt)
+    # 99.9th percentile, not the max: one outlier trajectory would otherwise stretch
+    # the range and waste every level on values the population never visits.
     scales = (float(jnp.quantile(jnp.abs(xs), 0.999)),
               float(jnp.quantile(jnp.abs(vs), 0.999)))
     feats = features(params, xs, vs, pool)
     logits = feats @ np.asarray(params.readout.W).T + np.asarray(params.readout.b)
-    pred_float = np.argmax(logits, 1)
+    pred_float = np.argmax(logits, 1)       # the twin's predictions, per the paper's metric
     acc_float = float((pred_float == Y).mean())
     print(f"float32 test acc {acc_float:.3f}   "
           f"(chance {1/n_classes:.3f})   scales x {scales[0]:.3g} v {scales[1]:.3g}")
 
     def readout_acc(f):
+        """Apply the UNCHANGED full-precision decoder to degraded features.
+
+        Returns (accuracy, agreement with the full-precision model). Agreement is
+        the paper's metric and is not the same as accuracy: a model can disagree
+        with its twin while still being right, and both can be wrong together.
+        """
         logit = f @ np.asarray(params.readout.W).T + np.asarray(params.readout.b)
         pred = np.argmax(logit, 1)
         return float((pred == Y).mean()), float((pred == pred_float).mean())
