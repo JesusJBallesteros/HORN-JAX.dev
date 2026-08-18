@@ -22,8 +22,11 @@ PREDICTIONS
 `experiments/probe_mechanism.py` measures separability at INITIALISATION, before
 any training. Two of three original predictions were wrong:
 
-  * `W_rec = 0` is at chance at every amplitude. A bank of
-    independent resonators cannot represent a biphase.
+  * `W_rec = 0` is at chance at every amplitude. A bank of independent LINEAR
+    resonators cannot represent a biphase. That qualifier matters: it is true
+    under the default `drive="output"` and false under `drive="input"`, the
+    reference model's placement, where an uncoupled bank reaches 0.76-0.80
+    because the stimulus is squashed before it arrives (docs/E05).
   * `rms` is at chance only while the system is LINEAR. Once the nonlinearity is
     engaged it converts biphase into power and rms climbs to 0.65.
   * `last` is NOT at chance once recurrence is engaged, it reaches 1.00. The
@@ -32,7 +35,8 @@ any training. Two of three original predictions were wrong:
 
 So the H1 being W_rec = 0, and the experiment:
 
-    W_rec = 0, any pooling, any amplitude   -> chance      (filter bank)
+    W_rec = 0, any pooling, any amplitude   -> chance      (filter bank,
+                                                          drive="output" only)
     W_rec free, states of order 0.1+        -> above chance
     heterogeneous > homogeneous             -> the diversity question
 

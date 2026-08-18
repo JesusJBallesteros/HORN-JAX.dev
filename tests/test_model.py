@@ -162,3 +162,46 @@ def test_rec_gain_rejects_unknown_values():
     with pytest.raises(ValueError, match="rec_gain"):
         init_net(jax.random.PRNGKey(0), 1, 8, 3,
                  f_hz=log_spaced_bands(8, 1.0, 10.0), zeta=0.1, rec_gain="nope")
+
+
+def test_drive_placement_changes_the_model():
+    """The two placements must be genuinely different, and buildable side by side.
+
+    Structural companion to
+    `test_dynamics.py::test_drive_placement_decides_linearity`, which carries the
+    physics. What is checked here is the plumbing that makes the comparison
+    runnable at all: that "input" allocates eps and bias while "output" leaves
+    them absent, that the output form's parameter tree is unchanged by their
+    existence (so every run recorded before the flag existed still reproduces),
+    and that gradients reach the two new parameters rather than sitting there
+    decoratively.
+    """
+    from horn.model import init_net, forward, loss_and_acc
+
+    f = jnp.linspace(4.0, 20.0, 8)
+    out = init_net(jax.random.PRNGKey(0), 2, 8, 3, f_hz=f, zeta=0.15, w_scale=1.0)
+    inp = init_net(jax.random.PRNGKey(0), 2, 8, 3, f_hz=f, zeta=0.15, w_scale=1.0,
+                   drive="input")
+
+    assert out.horn.log_eps is None and out.horn.bias is None
+    assert inp.horn.log_eps is not None and inp.horn.bias is not None
+    # None is an empty pytree node, so the output form still presents exactly the
+    # four HORN leaves plus the readout's two. If this count moves, an optimiser
+    # state saved before the flag existed no longer matches.
+    assert len(jax.tree.leaves(out)) == 6, jax.tree.leaves(out)
+    assert len(jax.tree.leaves(inp)) == 8
+
+    # eps carries the resonance normalisation that input_gain applies in the other
+    # form: same factor, moved outside the tanh where it can still act.
+    assert jnp.allclose(jnp.exp(inp.horn.log_eps),
+                        2 * 0.15 * (TWOPI * f) ** 2, rtol=1e-4)
+
+    x = jax.random.normal(jax.random.PRNGKey(1), (30, 5, 2))
+    y = jnp.array([0, 1, 2, 0, 1])
+    assert not jnp.allclose(forward(out, x, DT, "mean", "output"),
+                            forward(inp, x, DT, "mean", "input"))
+
+    g = jax.grad(lambda q: loss_and_acc(q, x, y, DT, "mean", "input")[0])(inp)
+    for name, leaf in [("log_eps", g.horn.log_eps), ("bias", g.horn.bias)]:
+        assert jnp.all(jnp.isfinite(leaf)), f"non-finite gradient in {name}"
+        assert float(jnp.linalg.norm(leaf)) > 0, f"{name} received zero gradient"

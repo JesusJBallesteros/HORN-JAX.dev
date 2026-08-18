@@ -56,7 +56,7 @@ F_HZ, NOISE, N_PER_CLASS = 10.0, 0.05, 400
 W_SCALES = (0.1, 1.0, 3.0, 10.0)
 
 
-def pooled_features(params, psi, n, key):
+def pooled_features(params, psi, n, key, drive="output"):
     """Run the network on ONE biphase class; return every pooling's features.
 
     One class per call, via a single-element `biphases` tuple, so the caller can
@@ -67,7 +67,7 @@ def pooled_features(params, psi, n, key):
     state = init_state(N_OSC, batch=n)
 
     def body(carry, u):
-        new, _ = horn_step(params.horn, carry, u, DT)
+        new, _ = horn_step(params.horn, carry, u, DT, drive)
         return new, (new.x, new.v)          # record both halves of the state
 
     _, (xs, vs) = jax.lax.scan(body, state, x)
@@ -116,7 +116,7 @@ def heldout_separability(feats, labels, n_classes, ridge=1e-2, seed=0):
     return float((np.argmax(F[te] @ W, 1) == labels[te]).mean())
 
 
-def recurrence_leverage(params, f_lo, f_hi, n_classes, rec_gain):
+def recurrence_leverage(params, f_lo, f_hi, n_classes, rec_gain, drive="output"):
     """How much does switching recurrence off actually change the output?
 
     This is the number that exposed the problem. If it is ~1e-4, "W_rec on/off"
@@ -129,8 +129,8 @@ def recurrence_leverage(params, f_lo, f_hi, n_classes, rec_gain):
     zeroed = params._replace(horn=params.horn._replace(
         W_rec=jnp.zeros_like(params.horn.W_rec)))
 
-    a = forward(params, x, DT, "meanrms")     # with recurrence
-    b = forward(zeroed, x, DT, "meanrms")     # without
+    a = forward(params, x, DT, "meanrms", drive)     # with recurrence
+    b = forward(zeroed, x, DT, "meanrms", drive)     # without
     # Largest absolute change, normalised by the scale of the scores themselves, so
     # the number is a RELATIVE effect and comparable across gain settings.
     rel = float(jnp.abs(a - b).max() / (jnp.abs(a).max() + 1e-12))
@@ -142,10 +142,19 @@ def recurrence_leverage(params, f_lo, f_hi, n_classes, rec_gain):
     return rel, drive_ratio
 
 
-def run_one(rep, rec_gain, n_classes, f_lo, f_hi):
-    """The full amplitude x recurrence grid for one gain setting."""
+def run_one(rep, gain, n_classes, f_lo, f_hi, drive="output"):
+    """The full amplitude x recurrence grid for one gain setting.
+
+    `gain` names the drive normalisation, but the two placements have a different
+    number of drive paths to normalise, so it reaches init_net through a different
+    argument in each: rec_gain under "output", where the external and recurrent
+    paths are scaled separately, and excitability under "input", where everything
+    passes through a single tanh and there is one gain outside it. The same
+    quantity, factored differently - see model.init_net.
+    """
     rep.print(f"\n{'='*72}")
-    rep.print(f"rec_gain = {rec_gain}")
+    knob = "rec_gain" if drive == "output" else "excitability"
+    rep.print(f"drive = {drive}   {knob} = {gain}")
     rep.print(f"{'='*72}")
     rep.print(f"{'w_scale':>7} {'W_rec':>6} {'rms|x|':>8} {'nonlin':>8} "
               f"{'W_in/W_rec':>11} {'leverage':>9} | {'mean':>6} {'rms':>6} {'last':>6}")
@@ -157,11 +166,12 @@ def run_one(rep, rec_gain, n_classes, f_lo, f_hi):
     for w_scale in W_SCALES:
         # Same PRNG key at every amplitude, so conditions differ only in the intended
         # variable and not in which random weights were drawn.
+        gain_kw = {"rec_gain": gain} if drive == "output" else {"excitability": gain}
         base = init_net(jax.random.PRNGKey(0), 1, N_OSC, n_classes,
                         f_hz=log_spaced_bands(N_OSC, f_lo, f_hi),
                         zeta=0.05, pool="meanrms", w_scale=w_scale,
-                        rec_gain=rec_gain)
-        lev, drive_ratio = recurrence_leverage(base, f_lo, f_hi, n_classes, rec_gain)
+                        drive=drive, **gain_kw)
+        lev, drive_ratio = recurrence_leverage(base, f_lo, f_hi, n_classes, gain, drive)
 
         for recurrence in ["free", "zero"]:
             params = base
@@ -174,7 +184,7 @@ def run_one(rep, rec_gain, n_classes, f_lo, f_hi):
             for c, psi in enumerate(DEFAULT_BIPHASES):
                 # One key per class, fixed, so the classes are matched trial for trial.
                 feats, xs = pooled_features(params, psi, N_PER_CLASS,
-                                            jax.random.PRNGKey(100 + c))
+                                            jax.random.PRNGKey(100 + c), drive)
                 for k in store:
                     store[k].append(feats[k])
                 labels += [c] * N_PER_CLASS      # labels built alongside, same order
@@ -195,7 +205,7 @@ def run_one(rep, rec_gain, n_classes, f_lo, f_hi):
                       f"{drive_ratio:>11.0f} {lev:>9.1e} | "
                       f"{acc['mean']:>6.3f} {acc['rms']:>6.3f} {acc['last']:>6.3f}")
 
-            rows.append(dict(rec_gain=rec_gain, w_scale=w_scale,
+            rows.append(dict(drive=drive, rec_gain=gain, w_scale=w_scale,
                              recurrence=recurrence, rms_x=float(np.sqrt((xs**2).mean())),
                              nonlin=float(nonlin), drive_ratio=drive_ratio,
                              leverage=lev, **{f"acc_{k}": v for k, v in acc.items()}))
@@ -251,7 +261,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rec-gain", nargs="+", default=["flat", "normalised"],
                     choices=["flat", "normalised"],
-                    help="run these in order; default runs both for comparison")
+                    help="run these in order; default runs both for comparison. "
+                         "Under --drive input these name the excitability instead, "
+                         "which is the same normalisation with one path to apply it to")
+    ap.add_argument("--drive", default="output", choices=["output", "input"],
+                    help="where the tanh sits. 'output' (default) is this repo's "
+                         "form and makes W_rec=0 a linear filter bank, which is what "
+                         "the control below rests on. 'input' is the reference "
+                         "model's form, in which that control does not exist. "
+                         "See horn/core.py and docs/E05.")
     ap.add_argument("--tag", default="probe_mechanism")
     args = ap.parse_args()
 
@@ -262,7 +280,11 @@ def main():
 
     suffix = "_vs_".join(g[:4] for g in args.rec_gain) if len(args.rec_gain) > 1 \
         else args.rec_gain[0]
-    name = f"{args.tag}_rec_{suffix}"
+    # The placement goes in the filename too. Two runs that differ only in where
+    # the tanh sits produce tables that look alike and mean different things, so the
+    # artefact is named after the condition - the same rule that keeps the two
+    # rec_gain runs from overwriting each other.
+    name = f"{args.tag}_{args.drive}_rec_{suffix}"
 
     with Report(name, "biphase separability at initialisation, no training") as rep:
         rep.print(f"biphase task: {n_classes} classes, chance {chance:.3f}, "
@@ -272,13 +294,24 @@ def main():
         rep.print(f"L={L}, dt={DT*1e3:.2f} ms, n_osc={N_OSC}, "
                   f"{N_PER_CLASS} examples per class")
 
+        placement = ("this repo, tanh on the output path" if args.drive == "output"
+                     else "reference model, tanh on the input path")
+        rep.print(f"drive = {args.drive} ({placement})")
+
         rows = []
-        for rec_gain in args.rec_gain:
-            rows += run_one(rep, rec_gain, n_classes, f_lo, f_hi)
+        for gain in args.rec_gain:
+            rows += run_one(rep, gain, n_classes, f_lo, f_hi, args.drive)
 
         rep.print(f"\nchance is {chance:.3f}. Two things to read:")
-        rep.print("  * W_rec=zero rows must sit at chance at EVERY amplitude - that is")
-        rep.print("    the filter-bank control, and the claim the experiment rests on.")
+        if args.drive == "output":
+            rep.print("  * W_rec=zero rows must sit at chance at EVERY amplitude - that is")
+            rep.print("    the filter-bank control, and the claim the experiment rests on.")
+        else:
+            rep.print("  * W_rec=zero rows are NOT expected at chance here, and that is why")
+            rep.print("    this form is worth running: tanh(W_in u) already contains the")
+            rep.print("    cubic cross-term the task asks for, so an uncoupled bank is not a")
+            rep.print("    filter bank. The control that falsifies under --drive output does")
+            rep.print("    not exist under --drive input.")
         rep.print("  * `leverage` is how much zeroing W_rec changes the logits. Below")
         rep.print("    ~1e-2 the recurrence variable does nothing and any sweep over it")
         rep.print("    is measuring noise, however many seeds it averages.")

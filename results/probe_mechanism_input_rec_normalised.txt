@@ -1,0 +1,32 @@
+# probe_mechanism_input_rec_normalised
+# biphase separability at initialisation, no training
+# generated 2026-08-18 09:11 UTC  commit 2e75e8f  python 3.13.5
+
+biphase task: 3 classes, chance 0.333, held-out sd 0.0192
+band 1.00-40.0 Hz, stimulus at 10 and 20 Hz
+L=400, dt=2.50 ms, n_osc=64, 400 examples per class
+drive = input (reference model, tanh on the input path)
+
+========================================================================
+drive = input   excitability = normalised
+========================================================================
+w_scale  W_rec   rms|x|   nonlin  W_in/W_rec  leverage |   mean    rms   last
+----------------------------------------------------------------------------------------
+    0.1   free    0.027  2.2e-03           9   1.1e-02 |  0.950  0.365  0.723
+    0.1   zero    0.027  2.2e-03           9   1.1e-02 |  0.757  0.367  0.720
+    1.0   free    0.125  3.2e-02           9   6.1e-02 |  1.000  1.000  1.000
+    1.0   zero    0.126  3.1e-02           9   6.1e-02 |  0.790  0.688  0.792
+    3.0   free    0.149  3.4e-02           9   1.0e-01 |  1.000  1.000  1.000
+    3.0   zero    0.151  3.4e-02           9   1.0e-01 |  0.795  0.678  0.795
+   10.0   free    0.158  3.4e-02           9   1.2e-01 |  1.000  1.000  1.000
+   10.0   zero    0.162  3.4e-02           9   1.2e-01 |  0.772  0.677  0.788
+
+chance is 0.333. Two things to read:
+  * W_rec=zero rows are NOT expected at chance here, and that is why
+    this form is worth running: tanh(W_in u) already contains the
+    cubic cross-term the task asks for, so an uncoupled bank is not a
+    filter bank. The control that falsifies under --drive output does
+    not exist under --drive input.
+  * `leverage` is how much zeroing W_rec changes the logits. Below
+    ~1e-2 the recurrence variable does nothing and any sweep over it
+    is measuring noise, however many seeds it averages.

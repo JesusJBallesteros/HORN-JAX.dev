@@ -18,6 +18,46 @@ and velocity) and retains information for free, because an underdamped
 oscillator rings. Temporal structure is intrinsic to the substrate rather than
 bolted on with gating machinery.
 
+WHERE THE NONLINEARITY SITS
+---------------------------
+The drive is nonlinear, and there are two places to put the nonlinearity. Both
+are standard, and they are not the same model:
+
+    drive="output"   f = W_in u + W_rec tanh(x)              <- the default here
+    drive="input"    f = eps * tanh(W_rec x + W_in u + b)    <- Effenberger et al.
+
+"output" saturates what a unit EMITS, and the receiver sums those bounded signals
+linearly. "input" saturates what a unit RECEIVES: everything arriving, stimulus
+included, is summed first and squashed afterwards. In the rate-model literature
+these are the voltage form and the activity form. They are not interchangeable,
+and here even less so than usual, because the nonlinearity sits inside a
+second-order operator with a different omega per unit.
+
+The consequence that matters is what ONE UNCOUPLED unit is:
+
+    "output"   a purely LINEAR filter. The stimulus reaches x through a plain
+               matrix, so nothing bends it until another unit's output arrives.
+               Every nonlinearity in the network is relational.
+    "input"    already nonlinear. A static squash followed by a resonator, before
+               any coupling exists at all.
+
+"output" is the default because it makes W_rec = 0 a genuinely linear filter
+bank, and that is the falsifying control the biphase experiment is built on
+(docs/E05). Under "input" the control is unavailable: tanh(W_in u) already
+contains the cubic cross-term the task asks for, so an uncoupled bank scores
+0.795 where the linear one scores chance. "A filter bank cannot represent a
+biphase" is therefore a statement about THIS model, not about the reference one,
+which is a fact about the instrument and belongs in the open rather than in a
+footnote. tests/test_dynamics.py::test_drive_placement_decides_linearity pins the
+distinction as superposition, which is what it actually is.
+
+"input" exists so that the comparison can be run.
+
+One second-order consequence: under "input" the drive is capped at eps however 
+large W_in grows, so the amplitude-collapse fix of E02, scaling W_in by 2*zeta*omega^2,
+does nothing there. The factor has to move OUTSIDE the tanh, which is precisely 
+what eps is. See model.init_net.
+
 NOTE ON JAX
 -----------
 JAX is functional: arrays are immutable and functions must have no side effects.
@@ -45,6 +85,17 @@ class HORNParams(NamedTuple):
     log_omega: jnp.ndarray  # (n_osc,)          LOG of natural frequency, one per oscillator
     log_zeta: jnp.ndarray   # (n_osc,)          LOG of damping ratio, one per oscillator
 
+    # Used by drive="input" ONLY, and left None under drive="output". A None field
+    # is an empty pytree node, so jax.grad and optax walk straight past it and the
+    # output form is byte-for-byte what it was before these two were added.
+    log_eps: jnp.ndarray = None    # (n_osc,) LOG of excitability: the gain OUTSIDE the
+                                   #          tanh, the reference model's eps. Log-stored
+                                   #          for the same reason omega and zeta are.
+    bias: jnp.ndarray = None       # (n_osc,) offset INSIDE the tanh. The reference model
+                                   #          carries b_hh and b_ih separately, but they
+                                   #          enter one tanh additively, so only their sum
+                                   #          is identifiable: one vector here, not two.
+
     # Why store the LOG of omega and zeta rather than the values themselves?
     # Gradient descent is unconstrained: it will happily push a parameter negative.
     # A negative zeta means NEGATIVE DAMPING, i.e. energy pumped into the oscillator
@@ -64,7 +115,8 @@ class HORNState(NamedTuple):
     v: jnp.ndarray  # velocity of each oscillator (= dx/dt)
 
 
-def init_params(key, in_size, n_osc, omega=1.0, zeta=0.1, w_scale=0.1):
+def init_params(key, in_size, n_osc, omega=1.0, zeta=0.1, w_scale=0.1,
+                drive="output"):
     """Create and randomly initialise the parameters of one HORN layer.
 
     Args:
@@ -78,6 +130,11 @@ def init_params(key, in_size, n_osc, omega=1.0, zeta=0.1, w_scale=0.1):
                  experiment.
         zeta:    damping ratio. <1 underdamped (rings), =1 critical, >1 overdamped.
         w_scale: standard deviation for weight initialisation.
+        drive:   which placement the parameters are being built for. "input" needs
+                 log_eps and bias, so they are allocated here; "output" leaves them
+                 None. This is the low-level constructor and it works in rad/s, so
+                 eps starts at 1 rather than at 2*zeta*omega^2 - the Hz-facing
+                 model.init_net is where the resonance normalisation belongs.
     """
     k_in, k_rec = jax.random.split(key)   # split one key into two independent keys.
                                           # Reusing the same key twice would give
@@ -101,6 +158,10 @@ def init_params(key, in_size, n_osc, omega=1.0, zeta=0.1, w_scale=0.1):
 
         log_omega=jnp.log(omega),   # store logs, per the reasoning in HORNParams above
         log_zeta=jnp.log(zeta),
+
+        # None under "output": an absent pytree leaf, invisible to grad and optax.
+        log_eps=jnp.zeros((n_osc,)) if drive == "input" else None,   # log(1) = 0
+        bias=jnp.zeros((n_osc,)) if drive == "input" else None,
     )
 
 
@@ -114,7 +175,7 @@ def init_state(n_osc, batch=None):
     return HORNState(x=jnp.zeros(shape), v=jnp.zeros(shape))
 
 
-def step(params, state, u, dt=0.1):
+def step(params, state, u, dt=0.1, drive="output"):
     """Advance the oscillator population by one timestep.
 
     Args:
@@ -122,9 +183,20 @@ def step(params, state, u, dt=0.1):
         state:  HORNState, current (x, v).
         u:      external input this step, shape (in_size,) or (batch, in_size).
         dt:     integration timestep. Smaller = more accurate but more compute.
-                Rule of thumb: dt must be well below the period of the FASTEST
-                oscillator, i.e. dt << 2*pi/omega_max. If dt is too large the
-                integration goes unstable and produces NaNs regardless of the learning rate.
+                The hard stability limit of symplectic Euler is dt*omega < 2:
+                measured, dt*omega = 1.99 survives and 2.01 gives NaN, regardless
+                of the learning rate. Stay well below it, because approaching the
+                limit is not merely less accurate but systematically biased: the
+                position amplitude is inflated by 1/sqrt(1 - (dt*omega/2)^2) and
+                the resonance sits at arcsin(dt*omega/2)/(pi*dt) rather than at
+                omega. At the ten-samples-per-period edge `model.usable_band`
+                allows, that is +5.3% in amplitude and +1.5% in frequency. Both
+                depend on omega, so in a heterogeneous bank they land unevenly
+                across the population.
+        drive:  where the nonlinearity sits: "output" (default) or "input". See
+                WHERE THE NONLINEARITY SITS at the top of this file. It is a
+                Python string rather than a traced value, so each setting compiles
+                its own branch and the choice costs nothing per step.
 
     Returns:
         (new_state, x) - the new state, and the position as this step's output.
@@ -134,20 +206,42 @@ def step(params, state, u, dt=0.1):
     zeta = jnp.exp(params.log_zeta)     # recover true damping from its log (always > 0)
 
     # --- the drive term f(x, u) -------------------------------------------------
-    # Two contributions summed:
+    # Both placements combine the same two contributions:
     #   u @ W_in.T          external input projected onto the oscillators
-    #   tanh(x) @ W_rec.T   recurrent input from every other oscillator
+    #   x @ W_rec.T         recurrent input from every other oscillator
+    # and both put a tanh somewhere. They differ ONLY in where, which is the whole
+    # point of the flag - see WHERE THE NONLINEARITY SITS at the top of this file.
     #
     # Why transpose? W_in is (n_osc, in_size) and u is (..., in_size). Writing
     # u @ W_in.T contracts over in_size and yields (..., n_osc). Crucially this
     # form works UNCHANGED whether u is (in_size,) or (batch, in_size), because
     # matmul broadcasts over leading axes. No separate batched code path needed.
     #
-    # Why tanh on the recurrent path? It bounds the coupling. Purely linear
-    # coupling makes the whole network a linear dynamical system - elegant, and
-    # exactly solvable, but it cannot compute anything a linear filter cannot.
-    # The saturating nonlinearity is where expressive power comes from.
-    drive = u @ params.W_in.T + jnp.tanh(state.x) @ params.W_rec.T
+    # Why a tanh at all? It bounds the coupling. Purely linear coupling makes the
+    # whole network a linear dynamical system - elegant, and exactly solvable, but
+    # it cannot compute anything a linear filter cannot. The saturating
+    # nonlinearity is where expressive power comes from.
+    if drive == "output":
+        # Saturation on what each unit SENDS. The external path stays linear, so
+        # an uncoupled unit is exactly a linear filter and superposition holds.
+        f = u @ params.W_in.T + jnp.tanh(state.x) @ params.W_rec.T
+    elif drive == "input":
+        # Saturation on what each unit RECEIVES. Stimulus and recurrent input are
+        # summed FIRST and squashed together, so the two mix inside the
+        # nonlinearity and not only through the network.
+        if params.log_eps is None or params.bias is None:
+            raise ValueError(
+                "drive='input' needs log_eps and bias, and both are None on "
+                "parameters built for the default output form. Build the network "
+                "with model.init_net(drive='input') or core.init_params(drive='input').")
+        # eps multiplies OUTSIDE the tanh, and it has to: |tanh| <= 1 caps the
+        # drive, so a gain folded into W_in would saturate rather than scale. This
+        # is the same 2*zeta*omega^2 factor that input_gain and rec_gain apply in
+        # the output form, moved to the only place it can still act.
+        f = jnp.exp(params.log_eps) * jnp.tanh(
+            state.x @ params.W_rec.T + u @ params.W_in.T + params.bias)
+    else:
+        raise ValueError(f"unknown drive: {drive!r} (expected 'output' or 'input')")
 
     # --- the equation of motion, rearranged for acceleration --------------------
     # From  x'' + 2*zeta*omega*x' + omega^2 * x = f   solve for x'':
@@ -156,8 +250,8 @@ def step(params, state, u, dt=0.1):
     #             |         |                +-- restoring force: pulls x back to 0.
     #             |         |                    This is the spring; it makes it oscillate.
     #             |         +-- damping/friction: opposes velocity, bleeds energy out.
-    #             +-- external + recurrent drive
-    accel = drive - 2.0 * zeta * omega * state.v - (omega ** 2) * state.x
+    #             +-- the drive f built above, under whichever placement was asked for
+    accel = f - 2.0 * zeta * omega * state.v - (omega ** 2) * state.x
 
     # --- SEMI-IMPLICIT (SYMPLECTIC) EULER INTEGRATION ---------------------------
     # The order of these two lines is the single most important detail in this file.
@@ -175,7 +269,7 @@ def step(params, state, u, dt=0.1):
     return HORNState(x=x, v=v), x
 
 
-def run_sequence(params, state, inputs, dt=0.1):
+def run_sequence(params, state, inputs, dt=0.1, drive="output"):
     """Run the network over a whole input sequence.
 
     Args:
@@ -188,7 +282,7 @@ def run_sequence(params, state, inputs, dt=0.1):
     def body(carry, u):
         # `carry` is the state threaded from one step to the next;
         # `u` is one slice of `inputs` along the leading (time) axis.
-        return step(params, carry, u, dt)
+        return step(params, carry, u, dt, drive)
 
     # jax.lax.scan is a compiled loop. A Python `for` loop would also work and give
     # identical numbers, but it would unroll into T copies of the graph - so a

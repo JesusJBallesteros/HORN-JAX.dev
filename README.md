@@ -34,7 +34,9 @@ varied ω is a filter bank.
 
 ## Results
 
-Full write-ups, one page per experiment, in [`docs/`](docs/README.md). The headlines:
+Full write-ups, one page per experiment, in [`docs/`](docs/README.md), and a visual
+summary of the architecture and the experiment log in [`docs/diagrams.md`](docs/diagrams.md).
+The headlines:
 
 **Sequential MNIST, single layer, linear readout** ([E03](docs/E03_smnist.md)):
 

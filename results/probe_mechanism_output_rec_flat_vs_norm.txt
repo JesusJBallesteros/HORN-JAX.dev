@@ -1,0 +1,43 @@
+# probe_mechanism_output_rec_flat_vs_norm
+# biphase separability at initialisation, no training
+# generated 2026-08-18 09:12 UTC  commit 2e75e8f  python 3.13.5
+
+biphase task: 3 classes, chance 0.333, held-out sd 0.0192
+band 1.00-40.0 Hz, stimulus at 10 and 20 Hz
+L=400, dt=2.50 ms, n_osc=64, 400 examples per class
+drive = output (this repo, tanh on the output path)
+
+========================================================================
+drive = output   rec_gain = flat
+========================================================================
+w_scale  W_rec   rms|x|   nonlin  W_in/W_rec  leverage |   mean    rms   last
+----------------------------------------------------------------------------------------
+    0.1   free    0.028  2.3e-03        6968   5.6e-05 |  0.323  0.365  0.320
+    0.1   zero    0.028  2.3e-03        6968   5.6e-05 |  0.323  0.365  0.320
+    1.0   free    0.279  1.4e-01        6968   5.3e-04 |  1.000  0.372  0.687
+    1.0   zero    0.279  1.4e-01        6968   5.3e-04 |  0.323  0.365  0.320
+    3.0   free    0.837  4.1e-01        6968   1.2e-03 |  1.000  0.418  1.000
+    3.0   zero    0.837  4.1e-01        6968   1.2e-03 |  0.323  0.365  0.320
+   10.0   free    2.789  6.8e-01        6968   3.6e-03 |  1.000  0.652  1.000
+   10.0   zero    2.790  6.8e-01        6968   3.6e-03 |  0.323  0.365  0.320
+
+========================================================================
+drive = output   rec_gain = normalised
+========================================================================
+w_scale  W_rec   rms|x|   nonlin  W_in/W_rec  leverage |   mean    rms   last
+----------------------------------------------------------------------------------------
+    0.1   free    0.028  2.3e-03           8   1.2e-02 |  0.333  0.363  0.318
+    0.1   zero    0.028  2.3e-03           8   1.2e-02 |  0.323  0.365  0.320
+    1.0   free    0.281  1.5e-01           8   8.3e-02 |  1.000  0.963  1.000
+    1.0   zero    0.279  1.4e-01           8   8.3e-02 |  0.323  0.365  0.320
+    3.0   free    0.859  4.0e-01           8   1.7e-01 |  1.000  1.000  1.000
+    3.0   zero    0.837  4.1e-01           8   1.7e-01 |  0.323  0.365  0.320
+   10.0   free    3.142  6.6e-01           8   3.7e-01 |  1.000  1.000  1.000
+   10.0   zero    2.790  6.8e-01           8   3.7e-01 |  0.323  0.365  0.320
+
+chance is 0.333. Two things to read:
+  * W_rec=zero rows must sit at chance at EVERY amplitude - that is
+    the filter-bank control, and the claim the experiment rests on.
+  * `leverage` is how much zeroing W_rec changes the logits. Below
+    ~1e-2 the recurrence variable does nothing and any sweep over it
+    is measuring noise, however many seeds it averages.

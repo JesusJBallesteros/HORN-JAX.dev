@@ -164,3 +164,52 @@ def test_gradients_flow():
     # Also confirm the gradient is not identically zero, which would mean the loss
     # is disconnected from the parameters and nothing would ever learn.
     assert float(jnp.linalg.norm(jax.tree.leaves(g)[0])) > 0
+
+
+def test_drive_placement_decides_linearity():
+    """TEST 6. the two drive placements are different models, and this is how.
+
+    The difference between drive="output" and drive="input" is not a detail of
+    where a tanh is typed. It decides what an UNCOUPLED unit is, and the honest
+    way to state that is superposition:
+
+        "output"  f = W_in u + W_rec tanh(x).  With W_rec = 0 the path from input
+                  to state is a plain matrix followed by a linear ODE, so the
+                  response to (a + b) is exactly the response to a plus the
+                  response to b. The network is a filter bank.
+        "input"   f = eps * tanh(W_rec x + W_in u + b).  With W_rec = 0 the input
+                  is still squashed before it reaches the oscillator, so
+                  superposition fails at the first unit.
+
+    docs/E05 rests on the first line: `W_rec = 0` is a falsifying control only
+    because it is genuinely linear. Under the reference model's placement that
+    control does not exist, and this test is what stops that fact from quietly
+    going missing again.
+    """
+    n_osc, dt, T = 6, 1e-3, 400
+    key = jax.random.PRNGKey(11)
+    a = jax.random.normal(jax.random.PRNGKey(12), (T, 2))     # two input streams,
+    b = jax.random.normal(jax.random.PRNGKey(13), (T, 2))     # deliberately O(1)
+
+    def response(params, u, drive):
+        # No coupling: whatever nonlinearity survives is the placement's doing,
+        # not the network's.
+        params = params._replace(W_rec=jnp.zeros_like(params.W_rec))
+        _, xs = run_sequence(params, init_state(n_osc), u, dt, drive)
+        return np.asarray(xs)
+
+    def superposition_error(drive):
+        p = init_params(key, in_size=2, n_osc=n_osc, omega=20.0, zeta=0.2,
+                        w_scale=1.0, drive=drive)
+        both = response(p, a + b, drive)
+        apart = response(p, a, drive) + response(p, b, drive)
+        # Relative, so the two placements are compared on the same footing even
+        # though they do not produce the same state magnitude.
+        return np.max(np.abs(both - apart)) / np.max(np.abs(both))
+
+    lin = superposition_error("output")
+    non = superposition_error("input")
+    assert lin < 1e-5, f'drive="output" with W_rec=0 is not linear: error {lin:.2e}'
+    assert non > 1e-2, (
+        f'drive="input" with W_rec=0 looks linear (error {non:.2e}); the tanh is '
+        "not engaged, so this test is not measuring what it claims")

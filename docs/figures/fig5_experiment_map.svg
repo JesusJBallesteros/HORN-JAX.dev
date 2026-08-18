@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 660" font-family="Helvetica,Arial,sans-serif">
+  <style>
+    .t{font-size:13px;fill:#111}.s{font-size:11.5px;fill:#444}.lbl{font-size:10.5px;fill:#666}
+    .h{font-size:16px;font-weight:bold;fill:#111}
+    .done{fill:#eef7ee;stroke:#4a8f4a;stroke-width:1.6}
+    .part{fill:#fdf6e3;stroke:#c9a227;stroke-width:1.6}
+    .plan{fill:#f2f2f2;stroke:#999;stroke-width:1.4;stroke-dasharray:4,3}
+    .meth{fill:#eef3fb;stroke:#2c6fb5;stroke-width:1.6}
+    .ar{stroke:#555;stroke-width:1.5;fill:none;marker-end:url(#a)}
+    .arw{stroke:#c05050;stroke-width:1.6;fill:none;marker-end:url(#r);stroke-dasharray:5,3}
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#555"/></marker>
+    <marker id="r" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#c05050"/></marker>
+  </defs>
+
+  <text x="30" y="28" class="h">Figure 5. The experiment log: what each step forced next</text>
+
+  <rect x="596" y="16" width="15" height="11" class="done"/><text x="617" y="26" class="lbl">done</text>
+  <rect x="663" y="16" width="15" height="11" class="part"/><text x="684" y="26" class="lbl">partly settled</text>
+  <rect x="762" y="16" width="15" height="11" class="plan"/><text x="783" y="26" class="lbl">designed</text>
+
+  <!-- ============ COLUMN A ============ -->
+  <rect x="30" y="52" width="240" height="60" rx="6" class="done"/>
+  <text x="44" y="73" class="t" font-weight="bold">E01  Core validated</text>
+  <text x="44" y="91" class="s">against closed-form physics</text>
+  <text x="44" y="106" class="lbl">energy flat at &#950;&#8594;0; symplectic Euler</text>
+
+  <path d="M150,114 L150,142" class="ar"/>
+  <text x="158" y="132" class="lbl">correct, and yet nothing would train</text>
+
+  <rect x="30" y="144" width="240" height="82" rx="6" class="done"/>
+  <text x="44" y="165" class="t" font-weight="bold">E02  Gain and readout statistic</text>
+  <text x="44" y="183" class="s">W_in &#215; 2&#950;&#969;&#178;; power, not mean</text>
+  <text x="44" y="200" class="lbl">mean 0.34 / final 0.35 / <tspan font-weight="bold">rms 1.00</tspan></text>
+  <text x="44" y="217" class="lbl">looked like a learning-rate bug, was not</text>
+
+  <path d="M150,228 L150,282" class="arw"/>
+  <text x="160" y="248" class="lbl" fill="#c05050">but a filter bank with a power</text>
+  <text x="160" y="263" class="lbl" fill="#c05050">readout would match this result</text>
+  <text x="160" y="278" class="lbl" fill="#c05050">so it does not test the claim</text>
+
+  <rect x="30" y="284" width="240" height="96" rx="6" class="part"/>
+  <text x="44" y="305" class="t" font-weight="bold">E05  Biphase task</text>
+  <text x="44" y="323" class="s">a task where power MUST fail</text>
+  <text x="44" y="340" class="lbl">at init: uncoupled bank at chance,</text>
+  <text x="44" y="356" class="lbl">coupled + nonlinear reaches 1.00</text>
+  <text x="44" y="372" class="lbl">fitted comparison still unresolved</text>
+
+  <!-- A -> B row1 -->
+  <path d="M272,180 L316,180" class="ar"/>
+
+  <!-- A -> B row3 -->
+  <path d="M272,320 L316,320" class="ar"/>
+  <text x="322" y="276" class="lbl" fill="#c05050">E05's first fitted grid was a broken instrument</text>
+
+  <!-- A down to E06 -->
+  <path d="M150,382 L150,470 L316,470" class="ar"/>
+  <text x="158" y="400" class="lbl">and it supplied the</text>
+  <text x="158" y="415" class="lbl">phase-coded task E06 needed</text>
+
+  <!-- ============ COLUMN B ============ -->
+  <rect x="320" y="144" width="240" height="82" rx="6" class="done"/>
+  <text x="334" y="165" class="t" font-weight="bold">E03 / E04  Benchmarks</text>
+  <text x="334" y="183" class="s">sMNIST 0.897 row / 0.794 pixel</text>
+  <text x="334" y="200" class="s">fitted &#969;,&#950; 0.897 vs frozen 0.872</text>
+  <text x="334" y="217" class="lbl">&#969; down 38%, &#950; collapses: both buy memory</text>
+
+  <rect x="320" y="284" width="240" height="96" rx="6" class="meth"/>
+  <text x="334" y="305" class="t" font-weight="bold">E00  Measure the lever</text>
+  <text x="334" y="323" class="s">methods note, from a discarded run</text>
+  <text x="334" y="340" class="lbl">gain on the afferent path but not the</text>
+  <text x="334" y="356" class="lbl">recurrent one: 6968:1, conditions</text>
+  <text x="334" y="372" class="lbl">bit-identical. Instrument, not null.</text>
+
+  <path d="M440,382 L440,424" class="ar"/>
+  <text x="448" y="400" class="lbl">installed a standing pre-sweep</text>
+  <text x="448" y="415" class="lbl">check, and a regression test</text>
+
+  <rect x="320" y="426" width="240" height="96" rx="6" class="done"/>
+  <text x="334" y="447" class="t" font-weight="bold">E06  Readout precision</text>
+  <text x="334" y="465" class="s">their hardware failure, reproduced</text>
+  <text x="334" y="482" class="lbl">collapse and recovery on their own task</text>
+  <text x="334" y="498" class="lbl">phase readout needs 14 bits, digits 6;</text>
+  <text x="334" y="514" class="lbl">the information runs the other way</text>
+
+  <!-- ============ COLUMN C ============ -->
+  <rect x="610" y="284" width="255" height="112" rx="6" class="plan"/>
+  <text x="624" y="305" class="t" font-weight="bold">E07  Nested bands</text>
+  <text x="624" y="323" class="s">fixed ratios + slow-phase gating</text>
+  <text x="624" y="340" class="lbl">A homogeneous / B spread / C banded /</text>
+  <text x="624" y="356" class="lbl">D banded + multiplicative gate</text>
+  <text x="624" y="372" class="lbl">C-vs-B isolates the structure,</text>
+  <text x="624" y="388" class="lbl">D-vs-C isolates the modulation</text>
+
+  <rect x="610" y="426" width="255" height="112" rx="6" class="plan"/>
+  <text x="624" y="447" class="t" font-weight="bold">E08  Spiking readout</text>
+  <text x="624" y="465" class="s">resonate-and-fire = HORN + threshold</text>
+  <text x="624" y="482" class="lbl">read spike phase against the slow band,</text>
+  <text x="624" y="498" class="lbl">which E07 supplies. The claim is about</text>
+  <text x="624" y="514" class="lbl">the SLOPE, not the intercept.</text>
+
+  <path d="M737,398 L737,422" class="ar"/>
+  <path d="M562,474 L604,474" class="ar"/>
+  <text x="330" y="550" class="lbl">E06 is the measured baseline E08 has to beat, which is why E08 is now a claim about the slope rather than a hope</text>
+
+  <text x="610" y="266" class="lbl" fill="#c05050">prerequisite: E05 must first separate its own two conditions</text>
+
+  <!-- bottom bar -->
+  <rect x="30" y="562" width="835" height="80" rx="6" fill="#fff" stroke="#333" stroke-width="1.3"/>
+  <text x="45" y="584" class="t" font-weight="bold">The through-line</text>
+  <text x="45" y="604" class="s">Each step was forced by a weakness in the one before it, and twice by a weakness found in a result that had already succeeded. E02 reached 1.00 and</text>
+  <text x="45" y="622" class="s">was set aside as insufficient; E05's first fitted grid was discarded as a broken instrument. What is claimed is smaller than what was run, deliberately.</text>
+</svg>

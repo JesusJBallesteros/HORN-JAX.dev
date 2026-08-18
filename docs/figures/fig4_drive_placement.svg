@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" font-family="Helvetica,Arial,sans-serif">
+  <style>
+    .t{font-size:14px;fill:#111}.s{font-size:12px;fill:#444}.m{font-size:13px;font-style:italic;fill:#111}
+    .h{font-size:16px;font-weight:bold;fill:#111}.lbl{font-size:11px;fill:#666}
+    .ar{stroke:#333;stroke-width:1.5;fill:none;marker-end:url(#a)}
+    .nl{fill:#ffe9c7;stroke:#c98a20;stroke-width:1.5}
+    .osc{fill:#eaf2fb;stroke:#2c6fb5;stroke-width:1.5}
+  </style>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#333"/></marker></defs>
+
+  <text x="30" y="28" class="h">Figure 4. Where the nonlinearity sits decides what an uncoupled unit is</text>
+  <text x="30" y="48" class="s">Two placements of the same tanh. Not a spelling difference: they are different models, and the falsifying control belongs to only one of them.</text>
+
+  <!-- OUTPUT -->
+  <rect x="30" y="66" width="405" height="215" rx="8" fill="#fbfdff" stroke="#2c6fb5" stroke-width="1.6"/>
+  <text x="45" y="90" class="t" font-weight="bold">drive = "output"  (this repository, default)</text>
+  <text x="45" y="112" class="m">f = W_in u + W_rec &#183; tanh(x)</text>
+
+  <rect x="45" y="130" width="60" height="34" rx="4" fill="#f4f4f4" stroke="#666"/><text x="62" y="152" class="s">u(t)</text>
+  <path d="M107,147 L142,147" class="ar"/><text x="110" y="140" class="lbl">W_in</text>
+  <circle cx="158" cy="147" r="14" fill="#fff" stroke="#333" stroke-width="1.4"/><text x="152" y="152" class="t">+</text>
+  <path d="M174,147 L212,147" class="ar"/>
+  <rect x="214" y="128" width="96" height="38" rx="4" class="osc"/><text x="228" y="152" class="s">oscillator</text>
+  <path d="M312,147 L352,147" class="ar"/><text x="356" y="152" class="s">x</text>
+  <path d="M330,147 L330,196 L228,196" class="ar"/>
+  <rect x="150" y="178" width="76" height="34" rx="4" class="nl"/><text x="163" y="200" class="s">tanh(x)</text>
+  <path d="M148,195 L120,195 L120,160" class="ar"/><text x="90" y="212" class="lbl">W_rec</text>
+
+  <rect x="45" y="226" width="375" height="44" rx="5" fill="#eef7ee" stroke="#4a8f4a"/>
+  <text x="58" y="245" class="s"><tspan font-weight="bold">With W_rec = 0 the unit is exactly LINEAR.</tspan> The stimulus reaches</text>
+  <text x="58" y="262" class="s">the oscillator through a plain matrix. Superposition holds to 1e-5.</text>
+
+  <!-- INPUT -->
+  <rect x="460" y="66" width="405" height="215" rx="8" fill="#fffdfa" stroke="#c98a20" stroke-width="1.6"/>
+  <text x="475" y="90" class="t" font-weight="bold">drive = "input"  (Effenberger et al., PNAS 2025)</text>
+  <text x="475" y="112" class="m">f = &#949; &#183; tanh(W_rec x + W_in u + b)</text>
+
+  <rect x="475" y="130" width="60" height="34" rx="4" fill="#f4f4f4" stroke="#666"/><text x="492" y="152" class="s">u(t)</text>
+  <path d="M537,147 L568,147" class="ar"/><text x="538" y="140" class="lbl">W_in</text>
+  <circle cx="584" cy="147" r="14" fill="#fff" stroke="#333" stroke-width="1.4"/><text x="578" y="152" class="t">+</text>
+  <path d="M600,147 L626,147" class="ar"/>
+  <rect x="628" y="129" width="66" height="36" rx="4" class="nl"/><text x="640" y="152" class="s">tanh</text>
+  <path d="M696,147 L718,147" class="ar"/><text x="700" y="140" class="lbl">&#215;&#949;</text>
+  <rect x="734" y="128" width="96" height="38" rx="4" class="osc"/><text x="748" y="152" class="s">oscillator</text>
+  <path d="M832,147 L856,147" class="ar"/><text x="858" y="152" class="s">x</text>
+  <path d="M844,147 L844,200 L600,200 L584,200 L584,163" class="ar"/><text x="700" y="215" class="lbl">W_rec, back INSIDE the tanh</text>
+
+  <rect x="475" y="226" width="375" height="44" rx="5" fill="#fdeeee" stroke="#c05050"/>
+  <text x="488" y="245" class="s"><tspan font-weight="bold">With W_rec = 0 the unit is ALREADY NONLINEAR:</tspan> a static</text>
+  <text x="488" y="262" class="s">squashing followed by a resonator. tanh(W_in u) has a cubic term.</text>
+
+  <!-- consequence -->
+  <text x="30" y="312" class="h">Consequence, measured on the same task with the same seeds</text>
+  <text x="30" y="332" class="s">Biphase separability at initialisation, uncoupled control (W_rec = 0), chance = 0.333</text>
+
+  <rect x="30" y="344" width="405" height="120" rx="6" fill="#eef7ee" stroke="#4a8f4a" stroke-width="1.4"/>
+  <text x="45" y="366" class="t" font-weight="bold">under "output"</text>
+  <text x="45" y="390" class="s">time-mean decoder:  <tspan font-weight="bold" font-size="15">0.323</tspan>   at every drive amplitude</text>
+  <text x="45" y="412" class="s">The control holds. A bank of independent linear</text>
+  <text x="45" y="429" class="s">resonators cannot form the product of components</text>
+  <text x="45" y="446" class="s">at f and 2f, so it cannot represent a biphase.</text>
+
+  <rect x="460" y="344" width="405" height="120" rx="6" fill="#fdeeee" stroke="#c05050" stroke-width="1.4"/>
+  <text x="475" y="366" class="t" font-weight="bold">under "input"</text>
+  <text x="475" y="390" class="s">time-mean decoder:  <tspan font-weight="bold" font-size="15">0.757 to 0.795</tspan></text>
+  <text x="475" y="412" class="s">The control FAILS. Sharpest at w_scale = 0.1, where</text>
+  <text x="475" y="429" class="s">the state is 0.027 and the tanh on the state does</text>
+  <text x="475" y="446" class="s">nothing (2.2e-03), yet the bank still reaches 0.757.</text>
+
+  <rect x="30" y="478" width="835" height="66" rx="6" fill="#f7f7fb" stroke="#666" stroke-width="1.2"/>
+  <text x="45" y="499" class="s"><tspan font-weight="bold">What survives.</tspan> The mechanism claim stands: recovering a biphase needs a product between components at f and 2f, and something must form it.</text>
+  <text x="45" y="518" class="s"><tspan font-weight="bold">What was overstated.</tspan> "A bank of independent LINEAR resonators cannot represent a biphase" is supported. "A HORN with W_rec = 0 cannot" is not,</text>
+  <text x="45" y="537" class="s">because under the reference placement an uncoupled unit is not linear. The default stays "output" precisely because that clean null is the better instrument.</text>
+</svg>

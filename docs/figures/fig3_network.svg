@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="Helvetica,Arial,sans-serif">
+  <style>
+    .t{font-size:14px;fill:#111}.s{font-size:12px;fill:#444}.m{font-size:13px;font-style:italic;fill:#111}
+    .h{font-size:16px;font-weight:bold;fill:#111}.lbl{font-size:11px;fill:#666}
+    .ar{stroke:#333;stroke-width:1.5;fill:none;marker-end:url(#a)}
+    .arr{stroke:#b5651d;stroke-width:1.3;fill:none;marker-end:url(#b)}
+    .stage{fill:#fff;stroke:#333;stroke-width:1.4}
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#333"/></marker>
+    <marker id="b" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#b5651d"/></marker>
+  </defs>
+
+  <text x="30" y="30" class="h">Figure 3. The network: one layer, and what the decoder is allowed to see</text>
+
+  <!-- input -->
+  <rect x="30" y="70" width="105" height="150" rx="6" class="stage" fill="#f7f7f7"/>
+  <text x="44" y="94" class="t" font-weight="bold">stimulus</text>
+  <text x="44" y="116" class="s">u(t)</text>
+  <text x="44" y="138" class="lbl">one value or</text>
+  <text x="44" y="154" class="lbl">one row per</text>
+  <text x="44" y="170" class="lbl">timestep</text>
+  <text x="44" y="196" class="lbl">T steps total</text>
+
+  <path d="M137,145 L182,145" class="ar"/>
+  <text x="140" y="137" class="lbl">W_in</text>
+
+  <!-- oscillator bank -->
+  <rect x="185" y="55" width="250" height="245" rx="8" fill="#eaf2fb" stroke="#2c6fb5" stroke-width="1.8"/>
+  <text x="200" y="78" class="t" font-weight="bold">oscillator population</text>
+  <text x="200" y="96" class="lbl">n units, each with its own &#969; and &#950;</text>
+
+  <circle cx="230" cy="130" r="17" fill="#fff" stroke="#2c6fb5" stroke-width="1.5"/><text x="215" y="134" class="lbl">2 Hz</text>
+  <circle cx="292" cy="130" r="17" fill="#fff" stroke="#2c6fb5" stroke-width="1.5"/><text x="277" y="134" class="lbl">8 Hz</text>
+  <circle cx="354" cy="130" r="17" fill="#fff" stroke="#2c6fb5" stroke-width="1.5"/><text x="337" y="134" class="lbl">32 Hz</text>
+  <circle cx="230" cy="196" r="17" fill="#fff" stroke="#2c6fb5" stroke-width="1.5"/><text x="215" y="200" class="lbl">4 Hz</text>
+  <circle cx="292" cy="196" r="17" fill="#fff" stroke="#2c6fb5" stroke-width="1.5"/><text x="275" y="200" class="lbl">16 Hz</text>
+  <circle cx="354" cy="196" r="17" fill="#fff" stroke="#2c6fb5" stroke-width="1.5"/><text x="335" y="200" class="lbl">64 Hz</text>
+
+  <path d="M247,130 C270,108 275,108 292,124" class="arr"/>
+  <path d="M309,130 C332,108 337,108 354,124" class="arr"/>
+  <path d="M230,179 C230,160 230,158 230,147" class="arr"/>
+  <path d="M354,179 C300,168 280,150 309,136" class="arr"/>
+  <text x="200" y="240" class="s">coupled all-to-all by <tspan font-style="italic">W_rec</tspan></text>
+  <text x="200" y="258" class="lbl">each unit keeps two numbers: x and x'</text>
+  <text x="200" y="276" class="lbl">state at every timestep, so the layer</text>
+  <text x="200" y="292" class="lbl">produces a (T &#215; n &#215; 2) trajectory</text>
+
+  <path d="M437,178 L487,178" class="ar"/>
+
+  <!-- pooling -->
+  <rect x="490" y="105" width="175" height="145" rx="6" class="stage" fill="#fdf6e3"/>
+  <text x="504" y="128" class="t" font-weight="bold">summary statistic</text>
+  <text x="504" y="146" class="lbl">the decoder never sees</text>
+  <text x="504" y="161" class="lbl">the time series, only this</text>
+  <text x="504" y="184" class="s">time-mean, or</text>
+  <text x="504" y="202" class="s">final value, or</text>
+  <text x="504" y="220" class="s"><tspan font-weight="bold">rms</tspan> (response power), or both</text>
+  <text x="504" y="240" class="lbl">one number per unit per channel</text>
+
+  <path d="M667,178 L712,178" class="ar"/>
+
+  <!-- readout -->
+  <rect x="715" y="120" width="150" height="115" rx="6" class="stage" fill="#f3f9f3"/>
+  <text x="729" y="143" class="t" font-weight="bold">linear decoder</text>
+  <text x="729" y="164" class="s">class scores</text>
+  <text x="729" y="186" class="lbl">deliberately linear, so</text>
+  <text x="729" y="201" class="lbl">any performance is due</text>
+  <text x="729" y="216" class="lbl">to the dynamics and not</text>
+  <text x="729" y="231" class="lbl">to a clever classifier</text>
+
+  <!-- read as (x, v/w) note -->
+  <rect x="490" y="262" width="375" height="38" rx="5" fill="#fff" stroke="#999" stroke-dasharray="3,2"/>
+  <text x="503" y="285" class="s">velocity enters as x'/&#969;, never raw: x' ~ &#969;x, so at 100 Hz raw x'</text>
+  <text x="503" y="299" class="lbl">is ~600&#215; x and would dominate the decoder through units alone</text>
+
+  <!-- gain normalisation panel -->
+  <text x="30" y="345" class="h">Both drives need the same gain correction</text>
+  <rect x="30" y="358" width="835" height="70" rx="6" fill="#fff5f5" stroke="#c05050" stroke-width="1.4"/>
+  <text x="45" y="380" class="s">Steady-state gain is <tspan font-style="italic">1/(2&#950;&#969;&#178;)</tspan>, so without correction fast units are silent. Scaling <tspan font-style="italic">W_in</tspan> by <tspan font-style="italic">2&#950;&#969;&#178;</tspan> fixes the afferent path.</text>
+  <text x="45" y="399" class="s">Recurrent input is <tspan font-weight="bold">also a drive</tspan>. Correcting only <tspan font-style="italic">W_in</tspan> left afferent drive <tspan font-weight="bold">6968&#215;</tspan> the recurrent one: the network was feedforward in all but name,</text>
+  <text x="45" y="418" class="s">and removing <tspan font-style="italic">W_rec</tspan> changed the output by 4e-4. Correcting both: ratio <tspan font-weight="bold">8:1</tspan>, and removing <tspan font-style="italic">W_rec</tspan> now moves the output by <tspan font-weight="bold">0.37</tspan>. (E00, E05)</text>
+
+  <!-- solver limit -->
+  <rect x="30" y="442" width="835" height="58" rx="6" fill="#f7f7fb" stroke="#666" stroke-width="1.2"/>
+  <text x="45" y="463" class="s"><tspan font-weight="bold">Timestep limit.</tspan> The solver is stable while <tspan font-style="italic">dt&#183;&#969; &lt; 2</tspan> (measured: 1.99 runs, 2.01 gives NaN). Well below is still wanted: amplitude is inflated by</text>
+  <text x="45" y="481" class="s">1/&#8730;(1&#8722;(dt&#969;/2)&#178;) and resonance shifts, so at ten samples per period a unit is 5.3% too loud and 1.5% too fast, unevenly across a mixed bank.</text>
+  <text x="45" y="496" class="lbl">Consequence: the fastest unit in the population sets the timestep, and therefore the cost of the whole simulation.</text>
+</svg>

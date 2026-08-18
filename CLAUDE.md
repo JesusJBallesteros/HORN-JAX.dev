@@ -17,9 +17,22 @@ oscillator recurrent network*, arXiv:2509.04064. Reference implementation: `brai
 - **`core.py` works in rad/s.** That is the form of the ODE. Everything user-facing is in
   **Hz**, converted at the boundary by `w_rads()`, `make_units()`, `drive_sine()`.
   `w = 2*pi*f`. Getting this wrong is a factor of 6.28 in every timescale.
+- **Where the tanh sits is a model choice, and it is a flag.** `drive="output"`
+  (default) is `f = W_in u + W_rec tanh(x)`; `drive="input"` is
+  `f = eps*tanh(W_rec x + W_in u + b)`, the reference model. They are different models,
+  not different spellings: under "output" an uncoupled unit is a LINEAR filter, under
+  "input" it is already nonlinear. The whole E05 falsifying control depends on the
+  first. Default stays "output" because that clean null is the better instrument; see
+  the header of `core.py` for the argument and docs/E05 for the measurement.
 - **Integration is semi-implicit (symplectic) Euler.** Velocity updates first, position
   uses the *new* velocity. Explicit Euler injects energy and diverges at zeta=0;
   `test_energy_conserved_when_undamped` catches it if the two lines are ever swapped.
+- **The solver's hard limit is `dt*omega < 2`,** not `2*pi/omega`. Measured: 1.99 runs,
+  2.01 gives NaN. Nothing guards a *learned* omega drifting across it. Well below the
+  limit is still wanted: position amplitude is inflated by `1/sqrt(1-(dt*omega/2)^2)` and
+  resonance sits at `arcsin(dt*omega/2)/(pi*dt)`, so at ten samples per period a unit is
+  5.3% too loud and 1.5% too fast. Both depend on omega, so a heterogeneous bank is
+  biased unevenly across itself.
 - **`omega` and `zeta` are stored as logs** so gradient descent cannot drive them negative.
   Negative damping is exponential blow-up.
 - **Readout reads `(x, v/omega)`, not `(x, v)`.** Since v ~ omega*x, raw velocity is ~600x
@@ -27,7 +40,10 @@ oscillator recurrent network*, arXiv:2509.04064. Reference implementation: `brai
 - **Gain normalisation must be applied to every drive, not just the external one.** The
   factor `2*zeta*omega^2` exists so that a drive produces an O(1) response. Recurrent input
   is a drive. Applying it to `W_in` alone leaves the network feedforward in all but name -
-  see `rec_gain` in `init_net` and the State entry below.
+  see `rec_gain` in `init_net` and the State entry below. Applying it to BOTH is one
+  per-unit gain on the whole drive, which is what the paper calls excitability `eps`;
+  under `drive="input"` it is spelled that way, and it must sit outside the tanh because
+  a gain inside would saturate rather than scale.
 - **Before sweeping over a variable, measure that it moves the output.** One forward pass
   with the variable switched off, compared against one with it on. A relative change below
   ~1e-2 means the sweep will return noise no matter how many seeds it averages.
@@ -66,7 +82,7 @@ Both were predicted by finding #1 above, and both look like a learning-rate prob
 ## Layout
 
 ```
-horn/core.py            dynamics: init_params, step, run_sequence, energy
+horn/core.py            dynamics: init_params, step(drive=...), run_sequence, energy
 horn/model.py           sequence model: init_net, forward, loss_and_acc, usable_band
 horn/tasks.py           freq_batch (plumbing check), biphase_batch (the phase question)
 horn/training.py        train / evaluate, freeze_osc and freeze_rec controls
@@ -74,9 +90,9 @@ horn/data.py            MNIST: IDX parsing, npz cache. Raises rather than faking
 horn/paths.py           REPO / DATA_DIR / RESULTS_DIR, anchored to the package
 horn/report.py          Report(): tees stdout to results/<name>.txt and saves matching
                         .json/.png with a provenance header (timestamp + commit hash)
-experiments/            probe_mechanism (separability at init), run_diversity (the grid),
+experiments/            probe_mechanism (separability at init, --drive), run_diversity (the grid),
                         readout_precision (in-loop vs sampled quantisation, E06)
-tests/                  32 tests. test_dynamics = physics; test_model = plumbing;
+tests/                  34 tests. test_dynamics = physics; test_model = plumbing;
                         test_tasks = task construction. See TESTING.md.
 docs/                   experiment log: E00 (methodology), E01-E06 (run), E07-E08
                         (designed, not started), reading.md (annotated bibliography)
@@ -119,6 +135,24 @@ HORN_repo_plan.md       private planning notes (gitignored). The parts worth kee
       `results/diversity_biphase_n24_L200_recflat.*` and `..._recnormalised.*`, plus
       `results/probe_mechanism_rec_flat_vs_norm.{txt,json,png}`. Interpreted into docs/E05
       (gain-bug section) and docs/E00 (the methodology lesson, now its own page).
+- [x] **Drive placement made selectable, and E05 rescoped.** The reference model
+      (Effenberger PNAS, Materials and Methods) squashes the summed drive,
+      `eps*tanh(W_rec x + W_in u + b)`; this repo squashes the recurrent output,
+      `W_in u + W_rec tanh(x)`. The difference decides what an uncoupled unit is, and
+      E05's falsifying control rested on it without saying so: under the reference
+      placement `W_rec = 0` scores 0.757-0.795, not chance, because `tanh(W_in u)`
+      supplies the cubic cross-term by itself. Sharpest at `w_scale=0.1`, where the
+      state-side `nonlin` diagnostic reads 2.2e-03 - the tanh on the state is doing
+      nothing and the uncoupled bank still reaches 0.757.
+      `core.step(drive=...)` now selects, `HORNParams` gained `log_eps` and `bias`
+      (None under "output", so that pytree is unchanged and old runs reproduce
+      bit-for-bit), and the flag is threaded through `model.forward`,
+      `training.train/evaluate_*` and `probe_mechanism.py --drive`. Guarded by
+      `test_drive_placement_decides_linearity` (superposition, the real distinction)
+      and `test_drive_placement_changes_the_model` (plumbing + leaf count). Records:
+      `results/probe_mechanism_input_rec_normalised.*` and
+      `..._output_rec_flat_vs_norm.*`, the latter identical to the pre-flag table.
+      Written up in docs/E05, "Which model the control belongs to".
 - [ ] Stacked layers
 - [ ] Nested banded omega with cross-frequency modulation vs flat heterogeneity, matched
       parameters, on a long-sequence task (E07 in docs/, designed but not started)
@@ -155,7 +189,10 @@ where power provably fails. That task now exists: the biphase (horn/tasks.py, do
 class-conditional power spectra are matched by construction. The at-init probe already delivered
 the sharp result, with a correction to the prediction: the falsifying control is the
 architecture (`W_rec = 0` at chance at every amplitude), not the pooling. An engaged tanh
-converts biphase into internal power and rms climbs to 0.65.
+converts biphase into internal power and rms climbs to 0.65. That control is a property of
+`drive="output"`: it is a statement about linear filter banks, and under the reference
+placement it does not exist. Scoped in docs/E05 and in the docstrings that asserted it
+unqualified (`horn/tasks.py`, `experiments/run_diversity.py`).
 
 What remains is the trained heterogeneous-vs-homogeneous grid (`run_diversity.py`), which asks
 whether frequency diversity wins at matched parameter count on a task where it is a

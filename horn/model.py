@@ -65,11 +65,31 @@ def log_spaced_bands(n_osc, f_lo, f_hi):
 # Construction
 
 def init_net(key, in_size, n_osc, n_out, f_hz, zeta, w_scale=0.1, readout_scale=1.0,
-             input_gain="normalised", rec_gain="flat", pool="rms"):
+             input_gain="normalised", rec_gain="flat", pool="rms",
+             drive="output", excitability="normalised"):
     """Build a one-layer HORN plus linear readout.
 
     f_hz : scalar or (n_osc,) array, in HERTZ.
     zeta : scalar or (n_osc,) array, damping ratio.
+
+    drive: WHICH MODEL, "output" (default) or "input". The argument decides where
+      the tanh sits and therefore what an uncoupled unit is; `core.step` carries
+      the full argument. It also decides which of the gain knobs below apply,
+      because the two forms have a different number of drive paths to normalise:
+
+        "output"  two paths, external and recurrent, each with its own linear
+                  weight matrix. `input_gain` and `rec_gain` scale them.
+                  `excitability` is unused; log_eps and bias stay None.
+        "input"   ONE path. Everything is summed into a single tanh, so there is
+                  one gain and it must sit outside the nonlinearity. That gain is
+                  `excitability`, the reference model's eps. `input_gain` and
+                  `rec_gain` are inapplicable and are not read.
+
+      Worth noticing rather than passing over: setting rec_gain="normalised" in
+      the output form makes both paths carry the same 2*zeta*omega^2 factor, i.e.
+      one per-unit gain multiplying the whole drive. That is what eps is. The fix
+      found by measurement in E05 and the parameter named in the reference paper
+      are the same quantity, factored differently.
 
     input_gain:
       "normalised" - scale each row of W_in by 2*zeta*omega^2 so that every
@@ -96,7 +116,14 @@ def init_net(key, in_size, n_osc, n_out, f_hz, zeta, w_scale=0.1, readout_scale=
                       response; recurrent input is a drive, so it belongs here
                       too. This is what makes recurrence actually matter.
 
-    `tests/test_model.py::test_drive_balance_and_recurrence_leverage` pins both.
+    excitability: how eps is set under drive="input". "normalised" gives
+      2*zeta*omega^2, the same resonance compensation input_gain applies in the
+      output form; "flat" gives 1 and reproduces the amplitude collapse of E02 on
+      purpose. Ignored under drive="output".
+
+    `tests/test_model.py::test_drive_balance_and_recurrence_leverage` pins the
+    output-form gains; `test_drive_placement_changes_the_model` pins the two forms
+    apart.
     """
     k_in, k_rec, k_out = jax.random.split(key, 3)  # one key per weight matrix, so no
                                                    # two of them share random draws
@@ -113,19 +140,46 @@ def init_net(key, in_size, n_osc, n_out, f_hz, zeta, w_scale=0.1, readout_scale=
     # each oscillator gets its own gain, applied across all of its inputs.
     resonance_gain = (2.0 * zeta * omega ** 2)[:, None]
 
-    if input_gain == "normalised":
-        gain_in = resonance_gain
-    elif input_gain == "flat":
-        gain_in = 1.0                    # scalar: broadcasts to a no-op
-    else:
-        raise ValueError(f"unknown input_gain: {input_gain}")
+    if drive not in ("output", "input"):
+        raise ValueError(f"unknown drive: {drive!r} (expected 'output' or 'input')")
 
-    if rec_gain == "normalised":
-        gain_rec = resonance_gain
-    elif rec_gain == "flat":
-        gain_rec = 1.0
+    if drive == "output":
+        # Two drive paths, so two gains. Validated even when they resolve to 1.0,
+        # because a typo in a gain name should fail here and not silently run the
+        # ungained network for an hour.
+        if input_gain == "normalised":
+            gain_in = resonance_gain
+        elif input_gain == "flat":
+            gain_in = 1.0                    # scalar: broadcasts to a no-op
+        else:
+            raise ValueError(f"unknown input_gain: {input_gain}")
+
+        if rec_gain == "normalised":
+            gain_rec = resonance_gain
+        elif rec_gain == "flat":
+            gain_rec = 1.0
+        else:
+            raise ValueError(f"unknown rec_gain: {rec_gain}")
+
+        log_eps = bias = None                # not part of this form
     else:
-        raise ValueError(f"unknown rec_gain: {rec_gain}")
+        # One drive path, so ONE gain, and it cannot live in the weights: they sit
+        # inside a tanh that caps the drive at eps no matter how large they get.
+        # Scaling W_in here would saturate the nonlinearity rather than raise the
+        # response, which is the E02 failure wearing a different hat.
+        gain_in = gain_rec = 1.0
+        if excitability == "normalised":
+            log_eps = jnp.log(resonance_gain[:, 0])   # back to (n_osc,)
+        elif excitability == "flat":
+            log_eps = jnp.zeros((n_osc,))             # log(1) = 0
+        else:
+            raise ValueError(f"unknown excitability: {excitability}")
+        # Zero bias starts the tanh centred, where it is odd, so at initialisation
+        # only odd-order terms mix. Learnable, and that matters: it is the odd
+        # symmetry that caps four evenly spaced biphases at 75% (see horn/tasks.py),
+        # so a bias free to move is the difference between a stimulus set the model
+        # can separate and one it provably cannot.
+        bias = jnp.zeros((n_osc,))
 
     horn = HORNParams(
         W_in=jax.random.normal(k_in, (n_osc, in_size)) * w_scale * gain_in,
@@ -134,6 +188,8 @@ def init_net(key, in_size, n_osc, n_out, f_hz, zeta, w_scale=0.1, readout_scale=
                * (w_scale / jnp.sqrt(n_osc)) * gain_rec),
         log_omega=jnp.log(omega),          # rad/s, log-stored for positivity
         log_zeta=jnp.log(zeta),
+        log_eps=log_eps,
+        bias=bias,
     )
 
     # Feature width must match what _pool will emit, or the readout matmul fails at
@@ -196,10 +252,15 @@ def _pool(xs, vs, mode):
     raise ValueError(f"unknown pool mode: {mode}")
 
 
-def forward(params, inputs, dt, pool="mean"):
+def forward(params, inputs, dt, pool="mean", drive="output"):
     """Run a batch of sequences and decode. inputs (T, B, in_size) -> scores (B, n_out).
 
     Time first, then batch: that is the axis order lax.scan iterates over.
+
+    `drive` must match what the parameters were built with. Nothing here can check
+    that for you: a network built with drive="input" run under "output" ignores
+    eps and bias and quietly becomes a different, weaker model rather than raising.
+    Thread the setting from one place per experiment, the way `pool` already is.
     """
     T, B, _ = inputs.shape
     n_osc = params.horn.log_omega.shape[0]      # infer width from the parameters
@@ -211,7 +272,7 @@ def forward(params, inputs, dt, pool="mean"):
     from horn.core import step as _step
 
     def body(carry, u):
-        new, _x = _step(params.horn, carry, u, dt)
+        new, _x = _step(params.horn, carry, u, dt, drive)
         return new, (new.x, new.v)              # carry the state, record (x, v)
 
     _, (xs, vs) = jax.lax.scan(body, state, inputs)   # xs, vs: (T, B, n_osc)
@@ -221,9 +282,9 @@ def forward(params, inputs, dt, pool="mean"):
     return feats @ params.readout.W.T + params.readout.b
 
 
-def loss_and_acc(params, inputs, labels, dt, pool="mean"):
+def loss_and_acc(params, inputs, labels, dt, pool="mean", drive="output"):
     """Cross-entropy loss and accuracy. `labels` are integer class indices."""
-    logits = forward(params, inputs, dt, pool)
+    logits = forward(params, inputs, dt, pool, drive)
     # log-softmax via logsumexp rather than log(softmax(...)): mathematically the
     # same, numerically safe, since exponentiating a large score would overflow.
     logp = logits - jax.scipy.special.logsumexp(logits, axis=-1, keepdims=True)

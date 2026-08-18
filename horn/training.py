@@ -22,7 +22,8 @@ import optax
 from horn.model import loss_and_acc
 
 
-def make_train_step(opt, dt, pool, freeze_osc=False, freeze_rec=False):
+def make_train_step(opt, dt, pool, freeze_osc=False, freeze_rec=False,
+                    drive="output"):
     """Build the jitted update. Flags are closed over, so each combination
     compiles once rather than branching inside the traced function."""
 
@@ -32,7 +33,7 @@ def make_train_step(opt, dt, pool, freeze_osc=False, freeze_rec=False):
         # has_aux=True says the function returns (loss, extra); only the first is
         # differentiated, and `acc` rides along untouched.
         (loss, acc), grads = jax.value_and_grad(
-            lambda q: loss_and_acc(q, x, y, dt, pool), has_aux=True)(params)
+            lambda q: loss_and_acc(q, x, y, dt, pool, drive), has_aux=True)(params)
 
         # Freezing is done on the GRADIENTS, not the parameters: a zeroed gradient
         # means the optimiser has nothing to apply, so those entries stay put.
@@ -57,7 +58,8 @@ def make_train_step(opt, dt, pool, freeze_osc=False, freeze_rec=False):
 
 
 def train(params, batch_fn, dt, pool, steps=400, batch=64, lr=3e-3, clip=1.0,
-          freeze_osc=False, freeze_rec=False, seed=0, eval_every=50, log=True):
+          freeze_osc=False, freeze_rec=False, seed=0, eval_every=50, log=True,
+          drive="output"):
     """Train on an endless stream of freshly generated batches.
 
     Note that `batch_fn` synthesises new data every call, so there is no fixed
@@ -71,7 +73,7 @@ def train(params, batch_fn, dt, pool, steps=400, batch=64, lr=3e-3, clip=1.0,
     # Adam's normalisation would have rescaled the spike already.
     opt = optax.chain(optax.clip_by_global_norm(clip), optax.adam(lr))
     opt_state = opt.init(params)                # Adam's moment estimates, one per parameter
-    step_fn = make_train_step(opt, dt, pool, freeze_osc, freeze_rec)
+    step_fn = make_train_step(opt, dt, pool, freeze_osc, freeze_rec, drive)
 
     key = jax.random.PRNGKey(seed)              # explicit RNG: same seed, same run
     hist = {"step": [], "loss": [], "acc": [], "gnorm": []}
@@ -101,7 +103,8 @@ def train(params, batch_fn, dt, pool, steps=400, batch=64, lr=3e-3, clip=1.0,
     return params, hist
 
 
-def evaluate_stream(params, batch_fn, dt, pool, n=2048, batch=256, seed=999):
+def evaluate_stream(params, batch_fn, dt, pool, n=2048, batch=256, seed=999,
+                    drive="output"):
     """Accuracy over freshly generated examples.
 
     For a synthetic task the honest evaluation is new samples from the generator,
@@ -117,12 +120,12 @@ def evaluate_stream(params, batch_fn, dt, pool, n=2048, batch=256, seed=999):
         x, y = batch_fn(k, size)
         # Accumulate a weighted count rather than averaging the per-chunk means, which
         # would over-weight a short final chunk.
-        correct += float(loss_and_acc(params, x, y, dt, pool)[1]) * size
+        correct += float(loss_and_acc(params, x, y, dt, pool, drive)[1]) * size
         total += size
     return correct / total
 
 
-def evaluate_arrays(params, X, Y, dt, pool, chunk=500):
+def evaluate_arrays(params, X, Y, dt, pool, chunk=500, drive="output"):
     """Accuracy over a fixed (T, N, F) array, in chunks to bound memory.
 
     Used for real datasets (sMNIST), where a genuine held-out split exists.
@@ -131,7 +134,7 @@ def evaluate_arrays(params, X, Y, dt, pool, chunk=500):
     for i in range(0, X.shape[1], chunk):       # slice along the BATCH axis (1), not time
         size = X[:, i:i + chunk].shape[1]       # actual chunk width, short at the end
         correct += float(loss_and_acc(params, X[:, i:i + chunk], Y[i:i + chunk],
-                                      dt, pool)[1]) * size
+                                      dt, pool, drive)[1]) * size
     return correct / X.shape[1]
 
 

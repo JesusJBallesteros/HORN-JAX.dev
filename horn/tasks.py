@@ -34,9 +34,17 @@ Three properties:
    contains a component at zero frequency proportional to cos(psi). 
    A DC offset that depends on the biphase.
 
- Prediction: a bank of INDEPENDENT resonators feeding a linear readout cannot do
- this at all, whatever the pooling, because no linear function of per-unit 
- features contains a product of two units.
+ Prediction: a bank of INDEPENDENT LINEAR resonators feeding a linear readout
+ cannot do this at all, whatever the pooling, because no linear function of
+ per-unit features contains a product of two units.
+
+ The word LINEAR is load-bearing and was missing from the first version of this
+ note. It holds under core.step(drive="output"), where the external path carries
+ no nonlinearity and W_rec = 0 leaves a genuine filter bank. It does NOT hold
+ under drive="input", the reference model's placement, where tanh(W_in u) squashes
+ the stimulus before it reaches any oscillator and supplies the cubic cross-term
+ on its own: the same uncoupled bank then scores 0.76-0.80 rather than chance.
+ See docs/E05, "Which model the control belongs to".
 
 MEASURED AT INITIALISATION, BEFORE TRAINING
 Held-out accuracy of a ridge readout on the pooled features of an UNTRAINED
@@ -57,7 +65,8 @@ Two conditions are required, and neither alone suffices:
     400, and a linear recurrent network is still just a filter bank.
 
 The control that falsifies is therefore the ARCHITECTURE (W_rec = 0), not the
-pooling. `rms` is only chance-level while the system is linear; once the
+pooling - in this model. Under the reference placement there is no such control,
+because an uncoupled unit is not linear to begin with. `rms` is only chance-level while the system is linear; once the
 nonlinearity is engaged it converts biphase into power too, which is why rms
 climbs to 0.652 at large amplitude. That is a real effect.
 
