@@ -95,7 +95,8 @@ experiments/            probe_mechanism (separability at init, --drive), run_div
 tests/                  34 tests. test_dynamics = physics; test_model = plumbing;
                         test_tasks = task construction. See TESTING.md.
 docs/                   experiment log: E00 (methodology), E01-E06 (run), E07-E08
-                        (designed, not started), reading.md (annotated bibliography)
+                        (designed, not started), reading.md (annotated bibliography),
+                        diagrams.md + figures/ (six summary figures)
 notebooks/01_test_core  validation against closed-form solutions
 notebooks/02_sequence_training  readout, training loop, sMNIST
 results/                curated figures and run records, committed on purpose

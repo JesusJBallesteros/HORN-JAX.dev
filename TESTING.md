@@ -37,10 +37,10 @@ pytest | tee results/pytest.txt                     # keep a copy
 
 ## What is tested, and why these things
 
-The suite is 32 tests in five files: physics in one place, plumbing in
+The suite is 34 tests in five files: physics in one place, plumbing in
 another, etc, so a failure points immediately at which kind of problem it is.
 
-### `/test_dynamics.py`: the physics (5 tests)
+### `/test_dynamics.py`: the physics (6 tests)
 
 Checks the model against closed-form solutions rather than against itself. An uncoupled,
 unforced HORN unit is a textbook damped harmonic oscillator, so ground truth exists.
@@ -53,11 +53,14 @@ unforced HORN unit is a textbook damped harmonic oscillator, so ground truth exi
 - **`test_heterogeneous_frequencies_are_independent`**: uncoupled units keep their own period,
   verified by FFT. This is the property the whole nested-frequency idea depends on.
 - **`test_gradients_flow`**: reverse-mode autodiff survives the full `lax.scan`.
+- **`test_drive_placement_decides_linearity`**: with `W_rec = 0`, superposition holds to 1e-5
+  under `drive="output"` and fails under `drive="input"`. This is the real distinction
+  between the two placements, and the scope of the E05 control rests on it.
 
 If an oscillator implementation is wrong it is almost always the integrator, and the first two
 catch that.
 
-### `/test_model.py`: the plumbing (10)
+### `/test_model.py`: the plumbing (11)
 
 Shapes, batch independence, gradient reach into every parameter including `log_omega` and
 `log_zeta`, the freeze mechanism, and the `usable_band` arithmetic. Two guards were added
@@ -65,6 +68,9 @@ with the rec-gain fix: `test_drive_balance_and_recurrence_leverage` pins the ext
 recurrent drive ratio and the leverage of `W_rec` on the decoder's class scores, so the
 network cannot silently regress to feedforward (the E00 lesson), and
 `test_rec_gain_rejects_unknown_values` closes the config surface.
+`test_drive_placement_changes_the_model` covers the plumbing side of the drive flag,
+including the parameter-tree leaf count, so that `drive="output"` still reproduces the
+earlier runs bit-for-bit.
 
 ### `/test_tasks.py`: task construction (7)
 
@@ -116,7 +122,7 @@ pytest --pdb            # drop into the debugger at the point of failure
 ```
 
 `--lf` ("last failed") reads `.pytest_cache/`, which is gitignored. After a green run it falls
-back to running everything, which is why it shows all 32 rather than nothing.
+back to running everything, which is why it shows all 34 rather than nothing.
 
 Tolerances in the physics tests are set to the accuracy the integrator can actually deliver, not
 to whatever made them pass. Semi-implicit Euler is first order, so error scales with `dt`. If a

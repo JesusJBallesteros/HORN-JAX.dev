@@ -11,7 +11,7 @@ amplitude) and eventually with spiking readouts.
 
 **The unit.** A standard RNN unit holds a scalar hidden state pushed around by a sigmoid,
 tanh, or a set of learned gates. A HORN unit is instead a damped, driven harmonic oscillator
-with a two-dimensional state, position x and velocity ẋ, evolving according to
+with a two-dimensional state, position x and velocity x', evolving according to
 
 ```math
 x'' + 2ζω x' + ω² x = f(x, u)
@@ -30,7 +30,16 @@ persistence is built in, because the unit rings. ζ sets how long, so it acts as
 memory horizon; ω sets which input frequencies a unit responds to, so a population with
 varied ω is a filter bank.
 
-![damping regimes and filter bank](results/demo.png)
+![the unit](docs/figures/fig1_unit.svg)
+
+**Where the nonlinearity sits is a modelling choice.** The drive can
+squash the recurrent output, `W_in u + W_rec tanh(x)` (`drive="output"`, the default here),
+or the summed input, `ε·tanh(W_rec x + W_in u + b)` (`drive="input"`, the reference model).
+These are different models, not different spellings: under the first an uncoupled unit is a
+linear filter, under the second it is already nonlinear. That difference decides the scope
+of the central control in [E05](docs/E05_biphase.md), and it is measured rather than argued.
+
+![tuning](docs/figures/fig2_tuning.png)
 
 ## Results
 
@@ -89,35 +98,56 @@ rather than an assumed one.
 **Phase is not yet doing the work through training** ([E05](docs/E05_biphase.md)). Every
 trained result above is reachable by a filter bank and a power readout. The biphase task
 exists to change that: the class is the relative phase of two tones whose power spectrum is
-identical by construction. At initialisation the probe shows the sharp result under both
-gain conventions: `W_rec = 0` is at chance at every amplitude, while recurrence plus an
-engaged nonlinearity reaches 1.00. The first trained grid was an instrument failure worth
-reading about ([E00](docs/E00_measure_the_lever.md)): a gain asymmetry left the network
-feedforward in all but name, recurrence moved the decoder's class scores by a relative
-4e-4, and conditions meant to differ came back bit-identical. Fixed
-(`rec_gain="normalised"`, leverage 3.6e-3 to 0.37),
-re-run at pilot scale, currently inconclusive; the properly sized grid is the remaining
-run.
+identical across classes by construction, so a power readout is at chance by design. At
+initialisation the probe gives the sharp result under both gain conventions: with
+`W_rec = 0` the population sits at chance at every drive amplitude, while recurrence plus an
+engaged nonlinearity reaches 1.00.
+
+**Then the same control was run against the reference model, and it failed**
+([E05](docs/E05_biphase.md#which-model-the-control-belongs-to)). Under `drive="input"` an
+uncoupled bank scores 0.757 to 0.795 instead of chance, because `tanh(W_in u)` supplies the
+cross-frequency product by itself, before the recurrence contributes anything. The sharpest
+row is the one where the tanh on the *state* is provably idle (2.2e-03) and the uncoupled
+bank still reaches 0.757. So the supported claim is narrower than the one first written
+down: *a bank of independent linear resonators cannot represent a biphase* holds, *a HORN
+with `W_rec = 0` cannot* does not. Frequency heterogeneity is a precondition under one
+placement and a convenience under the other. The default stays `"output"` precisely because
+its clean linear null is the better instrument, and that reasoning now lives in `core.py`
+rather than being inferable only by diffing against the paper.
+
+![drive placement](docs/figures/fig4_drive_placement.svg)
+
+**One grid before that was a broken instrument, not a null result**
+([E00](docs/E00_measure_the_lever.md)). Gain normalisation had been applied to the afferent
+weights and not the recurrent ones, leaving external drive 6968 times stronger; removing
+`W_rec` moved the decoder's class scores by a relative 4e-4, and conditions meant to differ
+returned bit-identical numbers. Fixed by `rec_gain="normalised"` (leverage 3.6e-3 to 0.37,
+pinned by a test). The properly sized grid is the remaining run; the pilot numbers are not
+evidence in either direction.
 
 ## Layout
 
 ```text
-horn/core.py                     dynamics: init_params, step, run_sequence, energy
+horn/core.py                     dynamics: init_params, step(drive=...), run_sequence, energy
 horn/model.py                    init_net, forward, loss_and_acc, usable_band, freeze_oscillators
 horn/tasks.py                    freq_batch (plumbing check), biphase_batch (the real question)
 horn/training.py                 train / evaluate, freeze_osc and freeze_rec controls
 horn/data.py                     MNIST: IDX parsing, caching, no synthetic fallback
 horn/paths.py                    repo-anchored paths, so output never lands in the cwd
-experiments/probe_mechanism.py   separability at init: which pooling, which regime
+horn/report.py                   Report(): transcript, JSON and figures under one stem,
+                                 with a provenance header (timestamp, commit, python)
+experiments/probe_mechanism.py   separability at init, across gains and drive placements
 experiments/run_diversity.py     heterogeneous-vs-homogeneous grid on the biphase task
-experiments/readout_precision.py quantised state, in-loop vs sampled, readout recovery
-tests/test_dynamics.py           5 tests: physics against closed-form solutions
-tests/test_model.py              10 tests: shapes, gradients, plumbing, drive balance
+experiments/readout_precision.py quantised state, in-loop vs observed, readout recovery
+tests/test_dynamics.py           6 tests: physics against closed-form solutions
+tests/test_model.py              11 tests: shapes, gradients, plumbing, drive balance
 tests/test_tasks.py              7 tests: task construction, matched spectra, no label leaks
 tests/test_data.py               6 tests: IDX parsing, cache validation, scaling
 tests/test_paths.py              4 tests: path anchoring, no import side effects
-docs/                            experiment log, one page each: question, result, reproduce
-results/                         committed figures and run records
+docs/                            experiment log E00-E08, reading list, diagrams
+docs/figures/                    the six summary figures; make_fig2.py regenerates the one
+                                 that is computed rather than drawn
+results/                         committed figures and run records, named by condition
 notebooks/01_test_core.ipynb     validation against analytic solutions
 notebooks/02_sequence_training.ipynb   readout, the two fixes, training, sMNIST
 demo.py                          damping regimes + frequency bank -> results/demo.png
@@ -133,6 +163,15 @@ TESTING.md                       how to run the suite, and what each test is for
   damping is exponential blow-up.
 - **The readout reads (x, v/ω), not (x, v).** Since v ~ ωx, raw velocity is ~600× position at
   100 Hz and would dominate the readout purely through units.
+- **Gain normalisation belongs on every drive, not only the external one.** The factor
+  `2ζω²` exists so a drive produces an O(1) response, and recurrent input is a drive.
+  Applying it to `W_in` alone leaves the network feedforward in all but name.
+- **The solver's hard limit is `dt·ω < 2`**, measured: 1.99 runs, 2.01 gives NaN. Well below
+  it is still wanted, since amplitude is inflated by `1/√(1-(dtω/2)²)` and the resonant peak
+  shifts, both ω-dependent and therefore uneven across a mixed population.
+- **Before sweeping a variable, measure that it moves the output.** One forward pass with it
+  on, one with it off. Below ~1e-2 relative change the sweep returns noise whatever the
+  seed count.
 - **Integration order matters.** Velocity updates first; position uses the *new* velocity.
   Swapping those two lines gives explicit Euler, which injects energy and diverges at ζ=0.
 
@@ -158,12 +197,16 @@ Ordered roughly by how much they changed what I did next.
    in different directions. E04 shows trained networks resolving the conflict in favour of
    memory.
 
-4. **The falsifying control is the architecture, not the pooling.** Going into the biphase
-   probe, the prediction was that `rms` pooling would be the control that stays at chance. It
-   is not: once the tanh is engaged the network converts biphase into internal power and rms
-   climbs to 0.65. What stays at chance at every amplitude is `W_rec = 0`. A bank of
-   independent resonators cannot form the product that carries the label, which is the claim
-   the whole experiment rests on, confirmed before training.
+4. **The falsifying control is the architecture, not the pooling, and it is narrower than
+   it first looked.** Going into the biphase probe the prediction was that `rms` pooling
+   would be the control that stays at chance. It is not: once the tanh is engaged the
+   network converts biphase into internal power and rms climbs to 0.65. What stays at
+   chance at every amplitude is `W_rec = 0`. But running the same control against the
+   reference model showed that this holds because of *where this repo puts the
+   nonlinearity*, not because of recurrence as such: move the tanh to the input path and an
+   uncoupled bank reaches 0.76 to 0.80. The supported claim is about linear filter banks,
+   and the doc now says so. Correcting the scope of a result I had already published to
+   myself was the most useful hour in the project.
 
 5. **A slow filter is a narrow one.** A sweeping input dwells in a unit's resonance peak for a
    time ∝ ζω while the unit needs `1/(ζω)` to fill, so the fraction of steady state reached
@@ -177,6 +220,12 @@ Ordered roughly by how much they changed what I did next.
    [E00](docs/E00_measure_the_lever.md) is this lesson written out; it has already caught
    three separate one-line bugs in this repo.
 
+7. **A departure from a published model.** This repo
+   squashes the recurrent output where the reference squashes the summed input. That was
+   originally an unexamined convenience, and it silently set the scope of the main result.
+   Making it `drive="output" | "input"` turned an implicit assumption into something that
+   can be measured, and the measurement was the interesting part.
+
 ## Limitations
 
 - **The sMNIST numbers are baselines, not comparisons.** One small single-layer model, default
@@ -186,6 +235,9 @@ Ordered roughly by how much they changed what I did next.
   probe shows the mechanism exists in an untrained network, under both gain conventions. The
   trained grid has only run at pilot scale, and its first version was invalidated by
   the rec-gain bug (E00); a properly sized run with a conditioned readout is still owed.
+- **The uncoupled-bank control is a statement about linear filter banks**, not about HORNs
+  in general. Under the reference drive placement it does not hold, and the repo says so in
+  the same page that reports the original result.
 - **Single layer only.** No claim here bears on depth.
 - **No comparison against `brainmass`.** Independent implementation validated against physics,
   not against the reference.
@@ -198,7 +250,7 @@ uv venv --python 3.12 && source .venv/bin/activate
 
 uv pip install -e ".[dev,notebooks]"        # CPU
 # uv pip install -e ".[cuda,dev,notebooks]" # NVIDIA GPU
-pytest                                      # 32 passed. Also see TESTING.md
+pytest                                      # 34 passed. Also see TESTING.md
 python demo.py                              # writes results/demo.png
 jupyter lab notebooks/                      # 01 then 02
 ```
@@ -214,6 +266,8 @@ MNIST downloads on first use and caches to `data/mnist.npz`.
 - [x] Frozen vs learned (ω, ζ)
 - [x] Readout precision: the analog paper's readout collapse, reproduced and dissected on
       biphase and on sMNIST, the paper's own task
+- [x] Drive placement made selectable, and the biphase control re-scoped against the
+      reference model ([E05](docs/E05_biphase.md))
 - [ ] Biphase: properly sized trained grid (the pilot run is recorded but inconclusive;
       see [E05](docs/E05_biphase.md))
 - [ ] Stacked layers
